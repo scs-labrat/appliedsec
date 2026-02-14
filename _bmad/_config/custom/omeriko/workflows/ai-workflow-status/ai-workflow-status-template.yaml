@@ -1,0 +1,24 @@
+# AI Workflow Status Template (Omeriko)
+
+# This tracks progress through AI/ML system development phases.
+# Designed to work with Omeriko agent and hand off to BMM for implementation.
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/ai-architecture.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "{{generated}}"
+project: "{{project_name}}"
+project_type: "{{project_type}}"
+ai_system_type: "{{ai_system_type}}"
+field_type: "{{field_type}}"
+workflow_path: "{{workflow_path_file}}"
+workflow_status: "{{workflow_items}}"

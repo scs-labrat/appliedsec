@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entity-parser
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: entity-parser
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ctem-normaliser
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: ctem-normaliser
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: orchestrator
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: context-gateway
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: context-gateway
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-router
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: llm-router
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: batch-scheduler
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: batch-scheduler
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentinel-adapter
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: sentinel-adapter
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-detection
+  namespace: aluskort
+spec:
+  selector:
+    app.kubernetes.io/name: atlas-detection
+  ports:
+    - port: 80
+      targetPort: 8080

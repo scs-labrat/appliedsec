@@ -1,0 +1,31 @@
+# Omeriko Module - Cyber AI Systems Architect
+# A BMM add-on module for AI/ML systems in cybersecurity
+
+code: omeriko
+name: "Omeriko: Cyber AI Systems Architect"
+header: "Cyber AI Systems Architect for DFIR & OS Internals"
+subheader: "Plan and architect AI/ML systems, then hand off to BMM agents for implementation"
+
+# This is an add-on to BMM - requires BMM to be installed
+addon_for: bmm
+
+metadata:
+  name: omeriko-module
+  version: 1.0.0
+  description: "Expert AI/ML Systems Architect for cybersecurity - forensics, incident response, and OS internals"
+  author: "Custom"
+  
+agents:
+  - omeriko
+
+workflows:
+  - ai-workflow-status
+
+# Integration with BMM workflow:
+# 1. Run AI-INIT to set up project tracking
+# 2. Use Omeriko for AI system design (SD, KB, TS, IO, RS)
+# 3. Use Omeriko's critical review (CR) to validate design
+# 4. Run AI-STATUS anytime to check progress
+# 5. Hand off to BMM architect for implementation architecture
+# 6. Hand off to BMM dev for coding
+# 7. Hand off to BMM qa for testing

@@ -1,0 +1,127 @@
+# Omeriko AI System Development - Greenfield
+# Full AI/ML system design methodology for new cyber-AI projects
+# Integrates with BMM for implementation
+
+method_name: "Omeriko AI System Development"
+track: "cyber-ai"
+field_type: "greenfield"
+description: "Complete AI/ML system design methodology for cybersecurity AI projects, with BMM handoff for implementation"
+
+phases:
+  - phase: 0
+    name: "Discovery & Requirements"
+    optional: true
+    note: "Initial problem exploration - optional but recommended"
+    workflows:
+      - id: "problem-discovery"
+        optional: true
+        agent: "omeriko"
+        command: "SD"
+        note: "Understand the security problem and define AI requirements"
+        output: "Problem statement and initial requirements"
+
+      - id: "data-assessment"
+        optional: true
+        agent: "omeriko"
+        command: "DP"
+        note: "Analyze available data sources and formats"
+        output: "Data inventory and preprocessing plan"
+
+  - phase: 1
+    name: "AI Architecture Design"
+    required: true
+    workflows:
+      - id: "system-design"
+        required: true
+        agent: "omeriko"
+        command: "SD"
+        output: "docs/ai-system-design.md"
+        note: "End-to-end AI system architecture"
+
+      - id: "knowledge-base"
+        conditional: "if_rag_system"
+        agent: "omeriko"
+        command: "KB"
+        output: "docs/rag-design.md"
+        note: "For RAG-based systems - embedding, chunking, retrieval design"
+
+      - id: "training-strategy"
+        conditional: "if_model_training"
+        agent: "omeriko"
+        command: "TS"
+        output: "docs/training-strategy.md"
+        note: "For systems requiring fine-tuning or custom models"
+
+      - id: "inference-optimization"
+        required: true
+        agent: "omeriko"
+        command: "IO"
+        output: "docs/inference-optimization.md"
+        note: "Production deployment constraints (RTX 4090, air-gap, etc.)"
+
+  - phase: 2
+    name: "Critical Review"
+    required: true
+    workflows:
+      - id: "design-review"
+        required: true
+        agent: "omeriko"
+        command: "CR"
+        output: "docs/design-review.md"
+        note: "Challenge the design before handoff"
+
+      - id: "research-check"
+        recommended: true
+        agent: "omeriko"
+        command: "RS"
+        output: "docs/research-notes.md"
+        note: "Identify relevant papers and cutting-edge techniques"
+
+  - phase: 3
+    name: "BMM Handoff"
+    required: true
+    note: "Generate documents for BMM implementation"
+    workflows:
+      - id: "generate-prd"
+        required: true
+        agent: "omeriko"
+        command: "HO-PRD"
+        output: "docs/prd.md"
+        note: "Product Requirements Document for BMM Architect"
+
+      - id: "generate-architecture"
+        required: true
+        agent: "omeriko"
+        command: "HO-ARCH"
+        output: "docs/architecture.md"
+        note: "Technical Architecture for BMM Dev"
+
+      - id: "generate-testing"
+        required: true
+        agent: "omeriko"
+        command: "HO-TEST"
+        output: "docs/testing-requirements.md"
+        note: "Testing Requirements for BMM QA"
+
+  - phase: 4
+    name: "BMM Implementation"
+    required: true
+    note: "Hand off to BMM standard agents"
+    workflows:
+      - id: "bmm-architect-review"
+        required: true
+        agent: "bmm-architect"
+        command: "@architect"
+        note: "BMM Architect reviews PRD and creates implementation plan"
+
+      - id: "bmm-dev-implement"
+        required: true
+        agent: "bmm-dev"
+        command: "@dev"
+        note: "BMM Dev implements based on architecture"
+
+      - id: "bmm-qa-test"
+        required: true
+        agent: "bmm-qa"
+        command: "@qa"
+        note: "BMM QA executes test plan"

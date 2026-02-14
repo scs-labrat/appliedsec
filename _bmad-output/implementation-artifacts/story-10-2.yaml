@@ -1,0 +1,15 @@
+id: "10-2"
+title: "Batch Scheduler with Time/Count Triggers"
+epic: 10
+status: done
+files:
+  - batch_scheduler/scheduler.py
+  - tests/test_batch_scheduler/test_scheduler.py
+summary: |
+  BatchScheduler with dual-trigger submission: count threshold (50 tasks)
+  or time threshold (6 hours), whichever fires first. enqueue()/enqueue_many()
+  accumulate tasks, should_flush() checks triggers, flush() submits and
+  clears queue. tick() is the main loop entry point. poll_active_jobs()
+  checks submitted/in_progress jobs. get_completed_jobs() returns jobs
+  needing result processing. Empty queue never flushes.
+tests: 20 passed

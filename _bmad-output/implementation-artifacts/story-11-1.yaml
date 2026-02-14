@@ -1,0 +1,23 @@
+id: "11-1"
+title: "Prometheus Metrics for All Services"
+epic: 11
+status: done
+files:
+  - ops/__init__.py
+  - ops/metrics.py
+  - tests/test_ops/__init__.py
+  - tests/test_ops/test_metrics.py
+summary: |
+  MetricDef frozen dataclass (name, type, description, labels, buckets).
+  29 total metrics across 8 services + shared Kafka metrics:
+  - Context Gateway: 5 (llm_calls, latency, cost, confidence, injections)
+  - Entity Parser: 3 (alerts_processed, parsing_latency, entities_extracted)
+  - LLM Router: 3 (routing_decisions, escalation, cost_saved)
+  - Orchestrator: 5 (active, by_state, duration, transitions, fp_shortcircuit)
+  - CTEM Normaliser: 2 (exposures_normalised, normalisation_latency)
+  - ATLAS Detection: 3 (rules_evaluated, alerts_triggered, evaluation_latency)
+  - Batch Scheduler: 3 (jobs_submitted, tasks_queued, sla_breaches)
+  - Kafka: 3 (consumer_lag, produce_errors, messages_consumed)
+  - Sentinel Adapter: 2 (events_ingested, ingest_latency)
+  SERVICE_METRICS map and ALL_METRICS flat list with aluskort_ prefix.
+tests: 22 passed

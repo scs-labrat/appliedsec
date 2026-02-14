@@ -1,0 +1,23 @@
+id: "11-3"
+title: "Kubernetes Deployment Manifests"
+epic: 11
+status: done
+files:
+  - infra/k8s/namespace.yaml
+  - infra/k8s/configmap.yaml
+  - infra/k8s/secrets.yaml
+  - infra/k8s/deployments.yaml
+  - infra/k8s/services.yaml
+summary: |
+  Kubernetes manifests for the aluskort namespace:
+  - Namespace: aluskort with app.kubernetes.io/part-of label
+  - ConfigMap: kafka_bootstrap, qdrant/redis/neo4j host:port, embedding
+    config, log_level, spend limits
+  - Secrets: Anthropic API key, Postgres DSN, Neo4j URI/password, Redis
+    password (base64 placeholders for sealed-secrets)
+  - 8 Deployments: entity-parser, ctem-normaliser, orchestrator,
+    context-gateway, llm-router, batch-scheduler, sentinel-adapter,
+    atlas-detection. Each with /health liveness + /ready readiness probes,
+    resource requests/limits, envFrom configmap+secrets
+  - 8 Services: ClusterIP port 80 → 8080 for each deployment
+tests: 0 (YAML manifests, validated by structure)

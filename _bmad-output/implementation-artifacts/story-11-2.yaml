@@ -1,0 +1,21 @@
+id: "11-2"
+title: "Alerting Rules"
+epic: 11
+status: done
+files:
+  - ops/alerts.py
+  - infra/prometheus/alerts.yml
+  - tests/test_ops/test_alerts.py
+summary: |
+  8 Prometheus alerting rules as frozen AlertRule dataclasses + YAML:
+  1. LLM Circuit Breaker Open (critical, context-gateway)
+  2. Kafka Consumer Lag > 1000 (warning, kafka)
+  3. Kafka Consumer Lag > 10000 (critical, kafka)
+  4. Stuck Investigation > 3h AWAITING_HUMAN (critical, orchestrator)
+  5. Monthly Spend > $500 soft limit (warning, context-gateway)
+  6. Monthly Spend > $1000 hard cap (critical, context-gateway)
+  7. Batch SLA Breach (warning, batch-scheduler)
+  8. Detection Rules Stopped (warning, atlas-detection)
+  render_prometheus_rules() outputs Prometheus-compatible rule group.
+  infra/prometheus/alerts.yml mirrors Python definitions.
+tests: 29 passed

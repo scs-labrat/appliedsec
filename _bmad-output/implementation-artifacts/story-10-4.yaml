@@ -1,0 +1,17 @@
+id: "10-4"
+title: "FP Pattern Generator"
+epic: 10
+status: done
+files:
+  - batch_scheduler/fp_generator.py
+  - tests/test_batch_scheduler/test_fp_generator.py
+summary: |
+  FPPatternGenerator analyses closed investigations to create batch tasks.
+  generate_fp_tasks() queries investigations WHERE state='closed', filters
+  for classification='false_positive', groups by alert_title prefix,
+  requires MIN_INVESTIGATIONS_FOR_FP=3 per group. generate_playbook_tasks()
+  queries non-FP closures, groups by primary technique, requires
+  MIN_INVESTIGATIONS_FOR_PLAYBOOK=2. generate_all_tasks() combines both.
+  Each task includes system prompt, JSON-serialised investigation data
+  (capped at 20 per group), and metadata with source_investigation_ids.
+tests: 17 passed

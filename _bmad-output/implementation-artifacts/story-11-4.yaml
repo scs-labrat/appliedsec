@@ -1,0 +1,15 @@
+id: "11-4"
+title: "GitHub Actions CI/CD Pipeline"
+epic: 11
+status: done
+files:
+  - .github/workflows/ci-cd.yml
+summary: |
+  GitHub Actions workflow with two jobs:
+  CI (test): Runs on push to main and PRs. Python 3.12, pip cache,
+  pytest with --cov=shared --cov-fail-under=90. Service containers:
+  postgres:16-alpine and redis:7-alpine with health checks.
+  CD (build-push): On successful CI on main only. Matrix strategy builds
+  Docker images for all 8 services, pushes to GHCR with commit SHA +
+  latest tags. Uses docker/build-push-action@v5.
+tests: 0 (YAML workflow, validated by structure)

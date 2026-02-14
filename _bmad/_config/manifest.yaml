@@ -1,0 +1,35 @@
+installation:
+  version: 6.0.0-Beta.8
+  installDate: 2026-02-13T19:18:55.199Z
+  lastUpdated: 2026-02-13T19:18:55.199Z
+modules:
+  - name: core
+    version: 6.0.0-Beta.8
+    installDate: 2026-02-13T19:18:54.017Z
+    lastUpdated: 2026-02-13T19:18:54.017Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: bmm
+    version: 6.0.0-Beta.8
+    installDate: 2026-02-13T19:18:49.985Z
+    lastUpdated: 2026-02-13T19:18:54.017Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: bmb
+    version: 0.1.6
+    installDate: 2026-02-13T19:18:53.810Z
+    lastUpdated: 2026-02-13T19:18:55.196Z
+    source: external
+    npmPackage: bmad-builder
+    repoUrl: https://github.com/bmad-code-org/bmad-builder
+  - name: omeriko
+    version: null
+    installDate: 2026-02-13T19:18:53.915Z
+    lastUpdated: 2026-02-13T19:18:55.199Z
+    source: custom
+    npmPackage: null
+    repoUrl: null
+ides:
+  - claude-code

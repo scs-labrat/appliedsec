@@ -1,0 +1,62 @@
+# Omeriko AI System - Quick RAG
+# Streamlined path for RAG-focused cyber AI projects
+# Faster route to implementation
+
+method_name: "Omeriko Quick RAG"
+track: "quick-rag"
+field_type: "greenfield"
+description: "Streamlined RAG system design for cyber knowledge bases - faster path to implementation"
+
+phases:
+  - phase: 1
+    name: "RAG Design"
+    required: true
+    workflows:
+      - id: "knowledge-base"
+        required: true
+        agent: "omeriko"
+        command: "KB"
+        output: "docs/rag-design.md"
+        note: "Full RAG architecture - sources, chunking, embedding, retrieval"
+
+      - id: "data-pipeline"
+        required: true
+        agent: "omeriko"
+        command: "DP"
+        output: "docs/data-pipeline.md"
+        note: "Data preprocessing and ingestion pipeline"
+
+      - id: "inference-optimization"
+        required: true
+        agent: "omeriko"
+        command: "IO"
+        output: "docs/inference-optimization.md"
+        note: "Deployment constraints and optimization"
+
+  - phase: 2
+    name: "Review & Handoff"
+    required: true
+    workflows:
+      - id: "critical-review"
+        recommended: true
+        agent: "omeriko"
+        command: "CR"
+        output: "docs/design-review.md"
+        note: "Quick design challenge"
+
+      - id: "generate-prd"
+        required: true
+        agent: "omeriko"
+        command: "HO-PRD"
+        output: "docs/prd.md"
+        note: "PRD for BMM handoff"
+
+  - phase: 3
+    name: "BMM Implementation"
+    required: true
+    workflows:
+      - id: "bmm-implement"
+        required: true
+        agent: "bmm-dev"
+        command: "@dev"
+        note: "BMM Dev implements RAG system"

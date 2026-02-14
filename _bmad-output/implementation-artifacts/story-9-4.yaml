@@ -1,0 +1,16 @@
+id: "9-4"
+title: "Detection Runner"
+epic: 9
+status: done
+files:
+  - atlas_detection/runner.py
+  - tests/test_atlas_detection/test_runner.py
+summary: |
+  DetectionRunner class: executes detection rules and publishes triggered
+  detections as CanonicalAlerts to alerts.raw Kafka topic.
+  detection_to_alert() converts DetectionResult -> CanonicalAlert with
+  source="atlas", severity lowercase, techniques list, raw_payload with
+  confidence/evidence/safety fields. Runner marks safety_relevant flag
+  when rule_id in SAFETY_RELEVANT_RULES. Graceful handling of rule
+  evaluation failures and Kafka publish errors.
+tests: 17 passed

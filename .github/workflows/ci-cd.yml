@@ -1,0 +1,110 @@
+name: ALUSKORT CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/aluskort
+
+jobs:
+  # ── CI: Lint and Test ─────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aluskort
+          POSTGRES_PASSWORD: aluskort
+          POSTGRES_DB: aluskort_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aluskort"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" pytest-cov
+
+      - name: Run tests with coverage
+        env:
+          POSTGRES_DSN: postgresql://aluskort:aluskort@localhost:5432/aluskort_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+        run: |
+          python -m pytest tests/ \
+            --cov=shared --cov-report=xml --cov-fail-under=90 \
+            -v --tb=short
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ── CD: Build and Push Docker Images ──────────────────────────
+  build-push:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - entity-parser
+          - ctem-normaliser
+          - orchestrator
+          - context-gateway
+          - llm-router
+          - batch-scheduler
+          - sentinel-adapter
+          - atlas-detection
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
+          build-args: |
+            SERVICE=${{ matrix.service }}

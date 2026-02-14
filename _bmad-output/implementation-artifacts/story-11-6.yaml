@@ -1,0 +1,20 @@
+id: "11-6"
+title: "Operations Runbook"
+epic: 11
+status: done
+files:
+  - docs/runbook.md
+summary: |
+  Step-by-step troubleshooting guides for 6 operational scenarios:
+  1. LLM Degradation — circuit breaker verification, Anthropic status,
+     deterministic fallback, pod restart, escalation path
+  2. Kafka Lag Spike — identify lagging consumer, check stuck partitions,
+     scale consumer group, handle poison messages
+  3. Cost Overrun — spend breakdown by tier, escalation storm mitigation,
+     batch scheduler pause, limit adjustment
+  4. DLQ Processing — inspect DLQ messages, identify failure reason,
+     replay messages, clear DLQ with retention trick
+  5. Stuck Investigations — identify stuck, notify analyst, approval
+     gate auto-expiry after 4h
+  6. Service Recovery — pod status, logs, readiness probe, rollout restart
+tests: 0 (documentation)

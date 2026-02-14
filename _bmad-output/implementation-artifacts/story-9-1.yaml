@@ -1,0 +1,18 @@
+id: "9-1"
+title: "Detection Models"
+epic: 9
+status: done
+files:
+  - atlas_detection/models.py
+  - atlas_detection/__init__.py
+  - tests/test_atlas_detection/__init__.py
+  - tests/test_atlas_detection/test_models.py
+summary: |
+  DetectionResult dataclass (13 fields: rule_id, triggered, alert_title,
+  alert_severity, atlas_technique, attack_technique, threat_model_ref,
+  confidence, evidence, entities, requires_immediate_action, safety_relevant,
+  timestamp with auto-UTC). DetectionRule ABC with rule_id, frequency,
+  lookback, evaluate(), is_safety_relevant, _apply_confidence_floor().
+  Safety constants: SAFETY_CONFIDENCE_FLOORS (DETECT-005=0.7, DETECT-009=0.7),
+  SAFETY_RELEVANT_RULES frozenset (004, 005, 009).
+tests: 17 passed

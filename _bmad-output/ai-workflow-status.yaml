@@ -1,0 +1,191 @@
+# AI Workflow Status (Omeriko)
+# This tracks progress through AI/ML system development phases.
+# Designed to work with Omeriko agent and hand off to BMM for implementation.
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/ai-architecture.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-02-14"
+project: "ALUSKORT"
+project_description: "Cloud-Neutral Security Reasoning Control Plane"
+project_type: "cyber-ai"
+ai_system_type: "Full Cyber AI System"
+field_type: "greenfield"
+workflow_path: "cyber-ai-greenfield"
+
+# Deployment Configuration (v2.0 — Cloud-Neutral Pivot)
+training_environment: "Any cloud / on-prem (Kubernetes / Nomad)"
+inference_environment: "Cloud-neutral (Kafka + microservices)"
+llm_backbone: "LLM Router: Tier 0 (Claude Haiku) + Tier 1 (Claude Sonnet/Opus) + Tier 2 (Claude Sonnet Batch API)"
+orchestrator: "LangGraph (graph-native DAG orchestration)"
+agent_framework: "Custom multi-agent graph (LangGraph-style)"
+auth_pattern: "OIDC / mTLS / API Keys (platform-neutral)"
+data_layer: "Postgres + Vector DB (Qdrant/pgvector) + Redis + Neo4j + Object Store"
+message_bus: "Kafka / Redpanda / NATS"
+
+# Architecture Pivot Note:
+# v1 was Azure-specific (Sentinel, Azure Functions, Semantic Kernel, Azure AI Search)
+# v2 is cloud-neutral following Critical Review (CR) — see docs/ai-system-design.md
+
+workflow_status:
+  # Phase 0: Discovery & Requirements (Optional)
+  - phase: 0
+    name: "Discovery & Requirements"
+    workflows:
+      - id: "problem-discovery"
+        status: optional
+        agent: "omeriko"
+        command: "SD"
+        note: "Understand the SOC automation problem and define AI requirements"
+        output: ""
+
+      - id: "data-assessment"
+        status: "docs/data-pipeline.md"
+        agent: "omeriko"
+        command: "DP"
+        note: "Queue-centric data pipeline: Kafka topics, entity parser microservice, adapter pattern, priority queues"
+        output: "docs/data-pipeline.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+  # Phase 1: AI Architecture Design (Required)
+  - phase: 1
+    name: "AI Architecture Design"
+    workflows:
+      - id: "system-design"
+        status: "docs/ai-system-design.md"
+        agent: "omeriko"
+        command: "SD"
+        note: "Cloud-neutral control plane: LLM Router, LangGraph, split data layer, Context Gateway, priority queues"
+        output: "docs/ai-system-design.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "knowledge-base"
+        status: "docs/rag-design.md"
+        condition: "if_rag_system"
+        agent: "omeriko"
+        command: "KB"
+        note: "Split retrieval: Postgres (structured), Vector DB (semantic), Redis (IOC exact match), vendor-neutral embeddings"
+        output: "docs/rag-design.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "training-strategy"
+        status: skipped
+        condition: "if_model_training"
+        agent: "omeriko"
+        command: "TS"
+        note: "Skipped — all tiers use Anthropic API (no fine-tuning available). Quality via prompt engineering + few-shot examples."
+        output: ""
+
+      - id: "inference-optimization"
+        status: "docs/inference-optimization.md"
+        agent: "omeriko"
+        command: "IO"
+        note: "Anthropic-only inference: Haiku (triage) + Sonnet (reasoning) + Opus (escalation) + Batch API. No GPU. ~$250-400/month for small SOC."
+        output: "docs/inference-optimization.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "atlas-integration"
+        status: "docs/atlas-integration.md"
+        agent: "omeriko"
+        command: "SD-supplement"
+        note: "MITRE ATLAS threat model: 17 TM-IDs, Python detection rules, Postgres telemetry tables, Kafka ingest"
+        output: "docs/atlas-integration.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "ctem-integration"
+        status: "docs/ctem-integration.md"
+        agent: "omeriko"
+        command: "SD-supplement"
+        note: "CTEM 5-phase: Neo4j graph consequence, Postgres upsert, Kafka per-source ingestion, SLA enforcement"
+        output: "docs/ctem-integration.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+  # Phase 2: Critical Review (Required)
+  - phase: 2
+    name: "Critical Review"
+    workflows:
+      - id: "design-review"
+        status: "completed-verbal"
+        agent: "omeriko"
+        command: "CR"
+        note: "CR completed — triggered cloud-neutral architectural pivot. 5 top risks identified, all addressed in v2.0 SD."
+        output: "docs/design-review.md"
+        completed: "2026-02-14"
+
+      - id: "research-check"
+        status: recommended
+        agent: "omeriko"
+        command: "RS"
+        note: "Cutting-edge SOC automation and AI agent techniques"
+        output: "docs/research-notes.md"
+
+  # Phase 3: BMM Handoff (Required)
+  - phase: 3
+    name: "BMM Handoff"
+    workflows:
+      - id: "generate-prd"
+        status: "docs/prd.md"
+        agent: "omeriko"
+        command: "HO-PRD"
+        note: "768 lines — 44 FRs + 28 NFRs with unique IDs, MoSCoW prioritization, code contracts, Kafka topic reference"
+        output: "docs/prd.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "generate-architecture"
+        status: "docs/architecture.md"
+        agent: "omeriko"
+        command: "HO-ARCH"
+        note: "10-section architecture doc — service specs, K8s manifests, Docker Compose, DB DDL, 11-step build sequence"
+        output: "docs/architecture.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+      - id: "generate-testing"
+        status: "docs/testing-requirements.md"
+        agent: "omeriko"
+        command: "HO-TEST"
+        note: "940 lines — 123 test cases (TC-*), pytest samples, JSON fixtures, testcontainers, cross-reference matrix to T1-T12 + IO-T1-T12"
+        output: "docs/testing-requirements.md"
+        completed: "2026-02-14"
+        version: "v2.0 (cloud-neutral pivot)"
+
+  # Phase 4: BMM Implementation (Required)
+  - phase: 4
+    name: "BMM Implementation"
+    workflows:
+      - id: "bmm-architect-review"
+        status: required
+        agent: "bmm-architect"
+        command: "@architect"
+        note: "BMM Architect reviews PRD and creates implementation plan"
+        output: ""
+
+      - id: "bmm-dev-implement"
+        status: required
+        agent: "bmm-dev"
+        command: "@dev"
+        note: "BMM Dev implements ALUSKORT based on architecture"
+        output: ""
+
+      - id: "bmm-qa-test"
+        status: required
+        agent: "bmm-qa"
+        command: "@qa"
+        note: "BMM QA executes test plan"
+        output: ""

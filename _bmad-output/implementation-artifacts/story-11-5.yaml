@@ -1,0 +1,17 @@
+id: "11-5"
+title: "Health Check Endpoints"
+epic: 11
+status: done
+files:
+  - ops/health.py
+  - tests/test_ops/test_health.py
+summary: |
+  HealthCheck class with liveness() and readiness() probes:
+  - Liveness: always returns HEALTHY (200) while process is alive
+  - Readiness: checks all service dependencies, returns HEALTHY (200),
+    DEGRADED (200, partial failure), or UNHEALTHY (503, all failed)
+  5 dependency checkers: check_postgres (SELECT 1), check_redis (PING),
+  check_kafka (list_topics), check_qdrant (health), check_neo4j
+  (verify_connectivity). SERVICE_DEPENDENCIES maps 8 services to their
+  required infrastructure. DependencyStatus and HealthResponse dataclasses.
+tests: 30 passed

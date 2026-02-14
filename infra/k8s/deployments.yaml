@@ -1,0 +1,392 @@
+---
+# Entity Parser
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entity-parser
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: entity-parser
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: entity-parser
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: entity-parser
+    spec:
+      containers:
+        - name: entity-parser
+          image: ghcr.io/aluskort/entity-parser:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# CTEM Normaliser
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ctem-normaliser
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: ctem-normaliser
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ctem-normaliser
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ctem-normaliser
+    spec:
+      containers:
+        - name: ctem-normaliser
+          image: ghcr.io/aluskort/ctem-normaliser:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# Orchestrator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: orchestrator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: ghcr.io/aluskort/orchestrator:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+# Context Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: context-gateway
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: context-gateway
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: context-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: context-gateway
+    spec:
+      containers:
+        - name: context-gateway
+          image: ghcr.io/aluskort/context-gateway:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+# LLM Router
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-router
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: llm-router
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-router
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-router
+    spec:
+      containers:
+        - name: llm-router
+          image: ghcr.io/aluskort/llm-router:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# Batch Scheduler
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch-scheduler
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: batch-scheduler
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: batch-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: batch-scheduler
+    spec:
+      containers:
+        - name: batch-scheduler
+          image: ghcr.io/aluskort/batch-scheduler:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# Sentinel Adapter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinel-adapter
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: sentinel-adapter
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sentinel-adapter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sentinel-adapter
+    spec:
+      containers:
+        - name: sentinel-adapter
+          image: ghcr.io/aluskort/sentinel-adapter:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# ATLAS Detection
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-detection
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/name: atlas-detection
+    app.kubernetes.io/part-of: aluskort
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlas-detection
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: atlas-detection
+    spec:
+      containers:
+        - name: atlas-detection
+          image: ghcr.io/aluskort/atlas-detection:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aluskort-config
+            - secretRef:
+                name: aluskort-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,20 @@
+id: "9-3"
+title: "Telemetry Tables"
+epic: 9
+status: done
+files:
+  - infra/migrations/004_atlas_telemetry.sql
+summary: |
+  DDL for 10 telemetry tables with TIMESTAMPTZ ts, TEXT tenant_id,
+  TIMESTAMPTZ ingested_at columns and indexes:
+  1. orbital_inference_logs (edge_node_id, model_version, confidence_score)
+  2. orbital_physics_oracle (constraint_id, check_result, latency_ms)
+  3. orbital_nl_query_logs (user_id, session_id, safety_filter_triggered)
+  4. orbital_api_logs (caller_ip, caller_identity, endpoint, response_code)
+  5. edge_node_telemetry (model_weight_hash, cpu/memory utilisation)
+  6. databricks_audit (user_id, action, target_resource, workspace_id)
+  7. model_registry (model_name, model_hash, stage, approved_by)
+  8. cicd_audit (pipeline_id, commit_hash, dependency_changes)
+  9. partner_api_logs (partner_id, direction, mtls_verified)
+  10. opcua_telemetry (sensor_count, data_points_received, protocol_violations)
+tests: 0 (DDL only)

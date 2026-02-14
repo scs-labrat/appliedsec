@@ -1,0 +1,106 @@
+# ALUSKORT Sprint Status
+# STATUS DEFINITIONS:
+#   ready-for-dev: Story is ready for development
+#   in-progress: Developer is actively working on story
+#   review: Implementation complete, awaiting code review
+#   done: Story accepted and merged
+
+project: ALUSKORT
+sprint: 1
+sprint_goal: "Epic 1 — Foundation: Shared Schemas and DB Clients"
+
+development_status:
+  # Epic 1: Foundation
+  epic-1: "done"
+  1-1-canonical-pydantic-models: "done"
+  1-2-postgres-client-wrapper: "done"
+  1-3-redis-client-wrapper: "done"
+  1-4-qdrant-client-wrapper: "done"
+  1-5-neo4j-client-wrapper: "done"
+  1-6-auth-utilities: "done"
+
+  # Epic 2: Infrastructure
+  epic-2: "done"
+  2-1-docker-compose: "done"
+  2-2-ddl-migrations: "done"
+  2-3-kafka-topics: "done"
+  2-4-qdrant-collections: "done"
+  2-5-neo4j-schema: "done"
+
+  # Epic 3: Entity Parser
+  epic-3: "done"
+  3-1-entity-parser-core: "done"
+  3-2-kafka-consumer: "done"
+  3-3-kafka-producer: "done"
+  3-4-input-validation: "done"
+  3-5-unit-tests: "done"
+
+  # Epic 4: Sentinel Adapter
+  epic-4: "done"
+  4-1-ingest-adapter-abc: "done"
+  4-2-event-hub-connector: "done"
+  4-3-field-mapping: "done"
+  4-4-contract-tests: "done"
+
+  # Epic 5: Context Gateway
+  epic-5: "done"
+  5-1-injection-detection: "done"
+  5-2-pii-redaction: "done"
+  5-3-prompt-builder: "done"
+  5-4-output-validator: "done"
+  5-5-anthropic-client: "done"
+  5-6-spend-guard: "done"
+  5-7-integration-tests: "done"
+
+  # Epic 6: LLM Router
+  epic-6: "done"
+  6-1-tiered-model-routing: "done"
+  6-2-concurrency-controller: "done"
+  6-3-escalation-manager: "done"
+  6-4-routing-metrics: "done"
+  6-5-unit-tests: "done"
+
+  # Epic 7: Orchestrator
+  epic-7: "done"
+  7-1-graphstate-persistence: "done"
+  7-2-ioc-extractor-agent: "done"
+  7-3-context-enricher-agent: "done"
+  7-4-reasoning-agent: "done"
+  7-5-response-agent: "done"
+  7-6-ctem-correlator-agent: "done"
+  7-7-atlas-mapper-agent: "done"
+  7-8-graph-wiring: "done"
+  7-9-fp-shortcircuit: "done"
+  7-10-integration-tests: "done"
+
+  # Epic 8: CTEM Normaliser
+  epic-8: "done"
+  8-1-wiz-normaliser: "done"
+  8-2-snyk-normaliser: "done"
+  8-3-garak-normaliser: "done"
+  8-4-art-normaliser: "done"
+  8-5-postgres-upsert: "done"
+  8-6-kafka-consumers: "done"
+
+  # Epic 9: ATLAS Detection
+  epic-9: "done"
+  9-1-detection-models: "done"
+  9-2-detection-rules: "done"
+  9-3-telemetry-tables: "done"
+  9-4-detection-runner: "done"
+
+  # Epic 10: Batch Scheduler
+  epic-10: "done"
+  10-1-batch-api-client: "done"
+  10-2-batch-scheduler: "done"
+  10-3-result-processor: "done"
+  10-4-fp-pattern-generator: "done"
+
+  # Epic 11: Operations
+  epic-11: "done"
+  11-1-prometheus-metrics: "done"
+  11-2-alerting-rules: "done"
+  11-3-kubernetes-manifests: "done"
+  11-4-cicd-pipeline: "done"
+  11-5-health-checks: "done"
+  11-6-operations-runbook: "done"

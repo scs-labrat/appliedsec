@@ -1,0 +1,28 @@
+# AI Workflow Status - Master Router and Status Tracker for Omeriko
+name: ai-workflow-status
+description: 'Lightweight status checker - answers "what should I do now?" for AI/ML system development. Reads YAML status file for workflow tracking. Use workflow-init for new projects.'
+author: "Omeriko Module"
+
+# Critical variables from config
+config_source: "{project-root}/_bmad/omeriko/config.yaml"
+output_folder: "{config_source}:output_folder"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+document_output_language: "{config_source}:document_output_language"
+date: system-generated
+
+# Workflow components
+installed_path: "{project-root}/_bmad/omeriko/workflows/ai-workflow-status"
+instructions: "{installed_path}/instructions.md"
+
+# Template for status file creation (used by workflow-init)
+template: "{installed_path}/ai-workflow-status-template.yaml"
+
+# Path definitions for project types
+path_files: "{installed_path}/paths/"
+
+# Output configuration - reads existing status
+default_output_file: "{output_folder}/ai-workflow-status.yaml"
+
+standalone: true
+

@@ -1,0 +1,26 @@
+# AI Workflow Init - Initial AI Project Setup
+name: ai-workflow-init
+description: "Initialize a new Omeriko AI project by determining type and creating workflow path"
+author: "Omeriko Module"
+
+# Critical variables from config
+config_source: "{project-root}/_bmad/omeriko/config.yaml"
+output_folder: "{config_source}:output_folder"
+user_name: "{config_source}:user_name"
+project_name: "{config_source}:project_name"
+communication_language: "{config_source}:communication_language"
+document_output_language: "{config_source}:document_output_language"
+date: system-generated
+
+# Workflow components
+installed_path: "{project-root}/_bmad/omeriko/workflows/ai-workflow-status/init"
+instructions: "{installed_path}/instructions.md"
+template: "{project-root}/_bmad/omeriko/workflows/ai-workflow-status/ai-workflow-status-template.yaml"
+
+# Path data files
+path_files: "{project-root}/_bmad/omeriko/workflows/ai-workflow-status/paths/"
+
+# Output configuration
+default_output_file: "{output_folder}/ai-workflow-status.yaml"
+
+standalone: true

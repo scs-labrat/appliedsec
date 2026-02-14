@@ -1,0 +1,17 @@
+id: "10-3"
+title: "Batch Result Processor"
+epic: 10
+status: done
+files:
+  - batch_scheduler/processor.py
+  - tests/test_batch_scheduler/test_processor.py
+summary: |
+  BatchResultProcessor routes completed batch results to storage:
+  FP patterns → Postgres fp_patterns table (pending_review status, 11-param
+  parameterised INSERT with ON CONFLICT), playbook drafts → Kafka
+  playbooks.draft topic. approve_fp_pattern() updates status to approved,
+  pushes to Redis hot cache for FP short-circuit, publishes to
+  knowledge.fp.approved Kafka topic. Partial failure handling: successful
+  items processed, failed items counted. Audit events published to
+  audit.events topic.
+tests: 14 passed

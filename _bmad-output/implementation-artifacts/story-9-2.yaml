@@ -1,0 +1,21 @@
+id: "9-2"
+title: "Detection Rules"
+epic: 9
+status: done
+files:
+  - atlas_detection/rules.py
+  - tests/test_atlas_detection/test_rules.py
+summary: |
+  10 detection rules (ATLAS-DETECT-001 through 010):
+  001 Training Data Poisoning — databricks_audit, DeviationFactor>3.0
+  002 Model Extraction — nl_query_logs, query_count>100
+  003 Prompt Injection — nl_query_logs, safety_filter_triggered
+  004 Adversarial Evasion — inference_logs, z-score<-2.0 (safety_relevant)
+  005 Physics Oracle DoS — physics_oracle, errors>3 (safety_relevant, immediate)
+  006 Supply Chain — model_registry + cicd_audit, unapproved promotions
+  007 Insider Exfiltration — api_logs, DevFactor>5.0
+  008 Alert Fatigue — investigations, SpikeRatio>5.0
+  009 Sensor Spoofing — opcua_telemetry, DataPointZScore>3.0 (safety_relevant)
+  010 Partner Compromise — partner_api_logs, volume dev>3.0
+  ALL_RULES registry with all 10 rule classes.
+tests: 45 passed

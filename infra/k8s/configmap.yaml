@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aluskort-config
+  namespace: aluskort
+  labels:
+    app.kubernetes.io/part-of: aluskort
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.aluskort.svc.cluster.local:9092"
+  QDRANT_HOST: "qdrant.aluskort.svc.cluster.local"
+  QDRANT_PORT: "6333"
+  REDIS_HOST: "redis.aluskort.svc.cluster.local"
+  REDIS_PORT: "6379"
+  NEO4J_HOST: "neo4j.aluskort.svc.cluster.local"
+  NEO4J_PORT: "7687"
+  EMBEDDING_MODEL: "text-embedding-3-small"
+  EMBEDDING_DIMENSIONS: "1536"
+  LOG_LEVEL: "INFO"
+  MONTHLY_SPEND_HARD_CAP: "1000"
+  MONTHLY_SPEND_SOFT_ALERT: "500"
