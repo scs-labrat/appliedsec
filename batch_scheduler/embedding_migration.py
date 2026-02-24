@@ -126,7 +126,10 @@ class EmbeddingMigrationJob:
             if self._embed_fn is not None:
                 new_vector = await self._embed_fn(point.get("payload", {}))
             else:
-                new_vector = point.get("vector", [])
+                raise ValueError(
+                    "embed_fn is required for migration — cannot copy old vectors "
+                    "as new model vectors. Provide an embedding function."
+                )
 
             # Upsert with new model metadata (idempotent)
             from shared.db.vector import enrich_payload

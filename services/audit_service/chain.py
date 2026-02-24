@@ -155,6 +155,24 @@ class ChainStateManager:
             return state
 
         genesis = create_genesis_record(tenant_id)
+
+        # C-02: Persist genesis record to audit_records table so chain
+        # verification can find it — not just in chain_state.
+        await self._db.execute(
+            "INSERT INTO audit_records (audit_id, tenant_id, sequence_number, "
+            "previous_hash, record_hash, timestamp, ingested_at, event_type, "
+            "event_category, severity, actor_type, actor_id, record_version, "
+            "source_service) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) "
+            "ON CONFLICT (audit_id) DO NOTHING",
+            genesis["audit_id"], genesis["tenant_id"],
+            genesis["sequence_number"], genesis["previous_hash"],
+            genesis["record_hash"], genesis["timestamp"],
+            genesis["ingested_at"], genesis["event_type"],
+            genesis["event_category"], genesis["severity"],
+            genesis["actor_type"], genesis["actor_id"],
+            genesis["record_version"], genesis["source_service"],
+        )
+
         await self.update_state(
             tenant_id,
             genesis["sequence_number"],

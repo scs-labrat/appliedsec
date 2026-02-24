@@ -162,7 +162,7 @@ class CanaryRolloutManager:
         dimension_map = {
             "tenant": "tenant",
             "rule_family": "pattern",
-            "severity": "technique",
+            "severity": "tenant",
             "datasource": "datasource",
         }
         ks_dimension = dimension_map.get(canary_slice.dimension, canary_slice.dimension)

@@ -97,9 +97,14 @@ class TestEmbeddingMigration:
             {"id": "p2", "vector": [0.3, 0.4], "payload": {"doc_id": "d2"}},
         ])
         pg = _make_pg_mock()
+
+        async def _embed(payload):
+            return [0.9, 0.8]
+
         job = EmbeddingMigrationJob(
             qdrant, pg, "old-model", "new-model",
             batch_size=10, rate_limit_rps=1000,
+            embed_fn=_embed,
         )
 
         result = await job.run()
@@ -116,9 +121,14 @@ class TestEmbeddingMigration:
         ]
         qdrant.fetch_points_by_model = AsyncMock(return_value=points)
         pg = _make_pg_mock()
+
+        async def _embed(payload):
+            return [0.9]
+
         job = EmbeddingMigrationJob(
             qdrant, pg, "old-model", "new-model",
             rate_limit_rps=1000,
+            embed_fn=_embed,
         )
 
         result1 = await job.run()
@@ -133,9 +143,14 @@ class TestEmbeddingMigration:
             {"id": "p3", "vector": [0.5], "payload": {"doc_id": "d3"}},
         ])
         pg = _make_pg_mock()
+
+        async def _embed(payload):
+            return [0.9]
+
         job = EmbeddingMigrationJob(
             qdrant, pg, "old-model", "new-model",
             rate_limit_rps=1000,
+            embed_fn=_embed,
         )
 
         result = await job.run(resume_from="p2")

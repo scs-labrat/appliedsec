@@ -59,18 +59,18 @@ class GraphState(BaseModel):
     state: InvestigationState = InvestigationState.RECEIVED
     alert_id: str = ""
     tenant_id: str = ""
-    entities: dict[str, Any] = {}
-    ioc_matches: list[Any] = []
-    ueba_context: list[Any] = []
-    ctem_exposures: list[Any] = []
-    atlas_techniques: list[Any] = []
-    similar_incidents: list[Any] = []
-    playbook_matches: list[Any] = []
-    decision_chain: list[Any] = []
+    entities: dict[str, Any] = Field(default_factory=dict)
+    ioc_matches: list[Any] = Field(default_factory=list)
+    ueba_context: list[Any] = Field(default_factory=list)
+    ctem_exposures: list[Any] = Field(default_factory=list)
+    atlas_techniques: list[Any] = Field(default_factory=list)
+    similar_incidents: list[Any] = Field(default_factory=list)
+    playbook_matches: list[Any] = Field(default_factory=list)
+    decision_chain: list[Any] = Field(default_factory=list)
     classification: str = ""
     confidence: float = 0.0
     severity: str = ""
-    recommended_actions: list[Any] = []
+    recommended_actions: list[Any] = Field(default_factory=list)
     requires_human_approval: bool = False
     risk_state: str = "unknown"
     llm_calls: int = 0

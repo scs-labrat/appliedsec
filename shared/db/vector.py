@@ -225,11 +225,18 @@ class QdrantWrapper:
         ``doc_id``, deduplicates by keeping the preferred version (or
         the newest version if no preference specified).
         """
-        results = self._client.query_points(
-            collection_name=collection,
-            query=query_vector,
-            limit=limit * 2,  # Over-fetch to account for dedup
-        )
+        try:
+            results = self._client.query_points(
+                collection_name=collection,
+                query=query_vector,
+                limit=limit * 2,  # Over-fetch to account for dedup
+            )
+        except (ConnectionError, TimeoutError, OSError) as exc:
+            raise RetriableQdrantError(str(exc)) from exc
+        except UnexpectedResponse as exc:
+            if exc.status_code and exc.status_code >= 500:
+                raise RetriableQdrantError(str(exc)) from exc
+            raise NonRetriableQdrantError(str(exc)) from exc
 
         raw = [
             {

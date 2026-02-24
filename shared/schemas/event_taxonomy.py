@@ -67,6 +67,11 @@ class EventTaxonomy(str, Enum):
     SPEND_SOFT_LIMIT = "spend.soft_limit"
     SPEND_HARD_LIMIT = "spend.hard_limit"
 
+    # Canary / shadow events (3)
+    CANARY_PROMOTED = "canary.promoted"
+    CANARY_ROLLED_BACK = "canary.rolled_back"
+    SHADOW_DECISION_LOGGED = "shadow.decision_logged"
+
     # System events (8)
     DEGRADATION_ENTERED = "degradation.entered"
     DEGRADATION_EXITED = "degradation.exited"
@@ -120,6 +125,10 @@ EVENT_CATEGORY_MAP: dict[EventTaxonomy, EventCategory] = {
     EventTaxonomy.ACCUMULATION_THRESHOLD_BREACHED: EventCategory.SECURITY,
     EventTaxonomy.SPEND_SOFT_LIMIT: EventCategory.SECURITY,
     EventTaxonomy.SPEND_HARD_LIMIT: EventCategory.SECURITY,
+    # Canary / shadow events
+    EventTaxonomy.CANARY_PROMOTED: EventCategory.DECISION,
+    EventTaxonomy.CANARY_ROLLED_BACK: EventCategory.DECISION,
+    EventTaxonomy.SHADOW_DECISION_LOGGED: EventCategory.DECISION,
     # System events
     EventTaxonomy.DEGRADATION_ENTERED: EventCategory.SYSTEM,
     EventTaxonomy.DEGRADATION_EXITED: EventCategory.SYSTEM,

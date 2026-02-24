@@ -70,7 +70,7 @@ class KillSwitchManager:
 
         if self._audit is not None:
             try:
-                await self._audit.emit(
+                self._audit.emit(
                     event_type="kill_switch.activated",
                     tenant_id=value if dimension == "tenant" else "",
                     data={
@@ -104,7 +104,7 @@ class KillSwitchManager:
 
         if self._audit is not None:
             try:
-                await self._audit.emit(
+                self._audit.emit(
                     event_type="kill_switch.deactivated",
                     tenant_id=value if dimension == "tenant" else "",
                     data={

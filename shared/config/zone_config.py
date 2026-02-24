@@ -7,20 +7,27 @@ the hardcoded ZONE_CONSEQUENCE_FALLBACK dicts.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 import yaml
 
 _DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "zone_consequences.yaml")
 
-# Module-level cache
+# Module-level cache with TTL
 _config: dict[str, Any] | None = None
+_config_loaded_at: float = 0.0
+_CACHE_TTL_SECONDS: float = 300.0  # 5 minutes
 
 
 def load_zone_consequences(path: str | None = None) -> dict[str, Any]:
-    """Load zone consequences from YAML. Caches after first load."""
-    global _config
-    if _config is not None and path is None:
+    """Load zone consequences from YAML. Caches for 5 minutes after first load."""
+    global _config, _config_loaded_at
+    if (
+        _config is not None
+        and path is None
+        and (time.monotonic() - _config_loaded_at) < _CACHE_TTL_SECONDS
+    ):
         return _config
 
     config_path = path or _DEFAULT_PATH
@@ -29,6 +36,7 @@ def load_zone_consequences(path: str | None = None) -> dict[str, Any]:
 
     if path is None:
         _config = data
+        _config_loaded_at = time.monotonic()
     return data
 
 
@@ -59,5 +67,6 @@ def get_consequence_for_zone(asset_zone: str) -> tuple[str, str]:
 
 def _reset_cache() -> None:
     """Reset the module cache (for testing)."""
-    global _config
+    global _config, _config_loaded_at
     _config = None
+    _config_loaded_at = 0.0

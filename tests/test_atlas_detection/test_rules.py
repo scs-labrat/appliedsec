@@ -517,9 +517,9 @@ class TestSensorSpoofing:
         )
         rule = SensorSpoofingRule()
         results = await rule.evaluate(db, NOW)
-        # Story 14.7: Trust downgrade (0.7x) applied after floor,
-        # so final confidence = 0.85 * 0.7 = 0.595
-        assert results[0].confidence == pytest.approx(0.85 * 0.7)
+        # H-01: Safety floor re-applied after trust downgrade:
+        # 0.85 * 0.7 = 0.595, then max(0.595, floor=0.7) = 0.7
+        assert results[0].confidence == pytest.approx(0.7)
 
 
 # ── ATLAS-DETECT-010 Partner Compromise ───────────────────────────

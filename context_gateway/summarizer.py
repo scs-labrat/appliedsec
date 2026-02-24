@@ -10,7 +10,10 @@ from __future__ import annotations
 import re
 
 from context_gateway.injection_detector import INJECTION_PATTERNS
-from context_gateway.pii_redactor import _EMAIL_RE
+import re as _re_module
+
+# H-08: Use local copy of pattern instead of importing private symbol
+_EMAIL_RE = _re_module.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b")
 
 # ---------- entity extraction regexes ----------------------------------------
 

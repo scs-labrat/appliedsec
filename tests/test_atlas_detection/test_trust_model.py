@@ -161,8 +161,9 @@ class TestTM06TrustLevel:
         )
         rule = SensorSpoofingRule()
         results = await rule.evaluate(db)
-        # Floor(0.85) = 0.85 (floor is 0.7), then downgrade: 0.85 * 0.7 = 0.595
-        assert results[0].confidence == pytest.approx(0.85 * 0.7)
+        # H-01: Safety floor re-applied after trust downgrade:
+        # 0.85 * 0.7 = 0.595, then max(0.595, floor=0.7) = 0.7
+        assert results[0].confidence == pytest.approx(0.7)
 
 
 # ---------------------------------------------------------------------------

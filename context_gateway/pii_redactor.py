@@ -120,6 +120,24 @@ def redact_pii(
         placeholder = redaction_map.get_or_create(match, "USER")
         text = text.replace(match, placeholder)
 
+    # H-02: Redact bare hostnames (e.g. SRV-DC01.corp.local)
+    # Skip common infra words, existing placeholders, and short acronyms
+    for match in _HOSTNAME_RE.findall(text):
+        # Skip if match is already a redaction placeholder
+        if match in redaction_map.reverse_mappings:
+            continue
+        # Skip short all-alpha strings (likely acronyms, not hostnames)
+        if match.isalpha() and len(match) <= 5:
+            continue
+        # Skip if the hostname base (before any dot) is an infra word
+        base = match.split(".")[0]
+        base_word = base.rstrip("0123456789").upper()
+        parts = re.split(r"[-_]", base_word)
+        if any(p in _HOSTNAME_EXCLUSIONS for p in parts):
+            continue
+        placeholder = redaction_map.get_or_create(match, "HOST")
+        text = text.replace(match, placeholder)
+
     # Story 15.4: hostname-with-username (e.g. JSMITH-LAPTOP)
     # F3: skip matches where second segment is a common infra word
     for match in _USERNAME_IN_HOSTNAME_RE.findall(text):

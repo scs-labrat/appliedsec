@@ -57,9 +57,10 @@ class FPShortCircuit:
         Shadow patterns are excluded from active matching.
         """
         # Kill switch check — if any dimension is killed, skip matching
-        if self._kill_switch is not None and tenant_id:
+        effective_tenant = tenant_id or state.tenant_id
+        if self._kill_switch is not None and effective_tenant:
             killed = await self._kill_switch.is_killed(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant,
                 technique_id=technique_id,
                 data_source=data_source,
             )
@@ -67,7 +68,6 @@ class FPShortCircuit:
                 return FPMatchResult(matched=False)
 
         # F5: pass tenant_id for tenant-scoped FP pattern keys
-        effective_tenant = tenant_id or state.tenant_id
         pattern_keys = await self._redis.list_fp_patterns(effective_tenant)
         state.queries_executed += 1
 

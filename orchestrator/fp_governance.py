@@ -68,6 +68,22 @@ class FPGovernanceManager:
         pattern["expiry_date"] = (now + timedelta(days=EXPIRY_DAYS)).isoformat()
         pattern["status"] = "approved"
 
+        # H-06: Emit audit event on two-person approval
+        if self._audit is not None:
+            try:
+                self._audit.emit(
+                    event_type="fp_pattern.approved",
+                    tenant_id=pattern.get("scope_tenant_id", ""),
+                    data={
+                        "pattern_id": pattern.get("pattern_id", ""),
+                        "approved_by_1": approver_1,
+                        "approved_by_2": approver,
+                        "expiry_date": pattern["expiry_date"],
+                    },
+                )
+            except Exception:
+                logger.warning("Failed to emit fp_pattern.approved audit event", exc_info=True)
+
         return pattern
 
     def check_expiry(self, patterns: list[dict]) -> list[str]:
@@ -155,11 +171,11 @@ class FPGovernanceManager:
         """
         # Query for investigations closed by this pattern
         query = """
-            SELECT investigation_id, state
+            SELECT investigation_id, state, tenant_id
             FROM investigations
             WHERE state = 'CLOSED'
             AND classification = 'false_positive'
-            AND decision_chain::text LIKE %s
+            AND decision_chain::text LIKE $1
         """
         pattern_marker = f'%"pattern_id": "{pattern_id}"%'
 
@@ -169,10 +185,11 @@ class FPGovernanceManager:
         for row in rows:
             inv_id = row["investigation_id"]
             old_state = row["state"]
+            row_tenant_id = row.get("tenant_id", "")
             update_query = """
                 UPDATE investigations
                 SET state = 'PARSING', updated_at = NOW()
-                WHERE investigation_id = %s
+                WHERE investigation_id = $1
             """
             await postgres_client.execute(update_query, inv_id)
             count += 1
@@ -183,7 +200,7 @@ class FPGovernanceManager:
                 try:
                     await producer.emit(
                         event_type="fp_pattern.revoked",
-                        tenant_id="",
+                        tenant_id=row_tenant_id,
                         data={
                             "pattern_id": pattern_id,
                             "investigation_id": inv_id,

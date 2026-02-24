@@ -104,7 +104,7 @@ class DetectionRunner:
             self._audit.emit(
                 tenant_id="system",
                 event_type="atlas.detection_fired",
-                event_category="detection",
+                event_category="decision",
                 actor_type="system",
                 actor_id="atlas-detection",
                 context={

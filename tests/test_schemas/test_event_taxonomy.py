@@ -37,7 +37,7 @@ class TestEventTaxonomy:
 
     def test_decision_events_count(self):
         count = sum(1 for v in EVENT_CATEGORY_MAP.values() if v == EventCategory.DECISION)
-        assert count == 12
+        assert count == 15  # 12 original + 3 canary/shadow events
 
     def test_action_events_count(self):
         count = sum(1 for v in EVENT_CATEGORY_MAP.values() if v == EventCategory.ACTION)

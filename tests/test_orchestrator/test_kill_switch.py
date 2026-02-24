@@ -99,11 +99,11 @@ class TestKillSwitchManager:
     async def test_audit_event_emitted_on_activate(self):
         """Audit producer receives kill_switch.activated event."""
         redis = _make_redis_client_mock()
-        audit = AsyncMock()
+        audit = MagicMock()
         mgr = KillSwitchManager(redis, audit_producer=audit)
 
         await mgr.activate("tenant", "t-001", "analyst@org")
-        audit.emit.assert_awaited_once()
+        audit.emit.assert_called_once()
         call_kwargs = audit.emit.call_args[1]
         assert call_kwargs["event_type"] == "kill_switch.activated"
         assert call_kwargs["data"]["dimension"] == "tenant"
@@ -112,7 +112,7 @@ class TestKillSwitchManager:
     async def test_audit_event_emitted_on_deactivate(self):
         """Audit producer receives kill_switch.deactivated event."""
         redis = _make_redis_client_mock()
-        audit = AsyncMock()
+        audit = MagicMock()
         mgr = KillSwitchManager(redis, audit_producer=audit)
 
         await mgr.deactivate("tenant", "t-001", "analyst@org")

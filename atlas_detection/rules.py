@@ -1,6 +1,6 @@
 """ATLAS detection rules — Story 9.2.
 
-10 detection rules (ATLAS-DETECT-001 through 010) with exact
+11 detection rules (ATLAS-DETECT-001 through 011) with exact
 statistical thresholds from the Orbital threat model.
 """
 
@@ -665,9 +665,10 @@ class SensorSpoofingRule(DetectionRule):
                 ))
 
         # Story 14.7: Apply trust downgrade for OPC-UA telemetry
+        # H-01: Re-apply safety floor after trust downgrade
         for r in results:
             conf, trust = self._apply_trust_downgrade(r.confidence, "opcua_telemetry")
-            r.confidence = conf
+            r.confidence = self._apply_confidence_floor(conf)
             r.telemetry_trust_level = trust
             r.attestation_status = "unavailable"
 
