@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Investigations - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Investigations</h1>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <form hx-get="/investigations" hx-target="body" hx-push-url="true" class="flex flex-wrap gap-4 items-end">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">State</label>
+                <select name="state" class="bg-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm border border-gray-600">
+                    <option value="">All States</option>
+                    <option value="received" {% if filters.state == 'received' %}selected{% endif %}>Received</option>
+                    <option value="parsing" {% if filters.state == 'parsing' %}selected{% endif %}>Parsing</option>
+                    <option value="enriching" {% if filters.state == 'enriching' %}selected{% endif %}>Enriching</option>
+                    <option value="reasoning" {% if filters.state == 'reasoning' %}selected{% endif %}>Reasoning</option>
+                    <option value="awaiting_human" {% if filters.state == 'awaiting_human' %}selected{% endif %}>Awaiting Human</option>
+                    <option value="responding" {% if filters.state == 'responding' %}selected{% endif %}>Responding</option>
+                    <option value="closed" {% if filters.state == 'closed' %}selected{% endif %}>Closed</option>
+                    <option value="failed" {% if filters.state == 'failed' %}selected{% endif %}>Failed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Severity</label>
+                <select name="severity" class="bg-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm border border-gray-600">
+                    <option value="">All Severities</option>
+                    <option value="critical" {% if filters.severity == 'critical' %}selected{% endif %}>Critical</option>
+                    <option value="high" {% if filters.severity == 'high' %}selected{% endif %}>High</option>
+                    <option value="medium" {% if filters.severity == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="low" {% if filters.severity == 'low' %}selected{% endif %}>Low</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Tenant</label>
+                <input type="text" name="tenant_id" value="{{ filters.tenant_id }}"
+                       class="bg-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm border border-gray-600"
+                       placeholder="Tenant ID">
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium">Filter</button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-700">
+            <thead class="bg-gray-750">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">ID</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Alert</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tenant</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">State</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Severity</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Updated</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-700" id="investigations-body">
+                {% for inv in investigations %}
+                <tr class="hover:bg-gray-750">
+                    <td class="px-4 py-3 text-sm font-mono">
+                        <a href="/investigations/{{ inv.investigation_id }}" class="text-blue-400 hover:text-blue-300">
+                            {{ inv.investigation_id[:12] }}...
+                        </a>
+                    </td>
+                    <td class="px-4 py-3 text-sm">{{ inv.alert_id or '-' }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-400">{{ inv.tenant_id or '-' }}</td>
+                    <td class="px-4 py-3 text-sm">
+                        {% if inv.state == 'reasoning' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-900 text-blue-300">{{ inv.state }}</span>
+                        {% elif inv.state == 'awaiting_human' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-900 text-yellow-300">{{ inv.state }}</span>
+                        {% elif inv.state == 'closed' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-900 text-green-300">{{ inv.state }}</span>
+                        {% elif inv.state == 'failed' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-900 text-red-300">{{ inv.state }}</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 text-gray-300">{{ inv.state }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                        {% if inv.severity == 'critical' %}
+                        <span class="text-red-400 font-medium">{{ inv.severity }}</span>
+                        {% elif inv.severity == 'high' %}
+                        <span class="text-orange-400">{{ inv.severity }}</span>
+                        {% elif inv.severity == 'medium' %}
+                        <span class="text-yellow-400">{{ inv.severity }}</span>
+                        {% else %}
+                        <span class="text-gray-400">{{ inv.severity or '-' }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-400">{{ inv.updated_at or '-' }}</td>
+                    <td class="px-4 py-3 text-sm">
+                        <a href="/investigations/{{ inv.investigation_id }}" class="text-blue-400 hover:text-blue-300 text-xs">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">No investigations found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if investigations %}
+    <div class="flex justify-between items-center text-sm text-gray-400">
+        <span>Page {{ page }}</span>
+        <div class="space-x-2">
+            {% if page > 1 %}
+            <a href="/investigations?page={{ page - 1 }}&state={{ filters.state }}&severity={{ filters.severity }}"
+               class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">Previous</a>
+            {% endif %}
+            {% if investigations|length == 25 %}
+            <a href="/investigations?page={{ page + 1 }}&state={{ filters.state }}&severity={{ filters.severity }}"
+               class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">Next</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Investigation {{ inv.investigation_id[:12] }} - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="/investigations" class="text-sm text-gray-400 hover:text-gray-300">&larr; Back to list</a>
+            <h1 class="text-2xl font-bold mt-1">Investigation {{ inv.investigation_id[:16] }}...</h1>
+        </div>
+        <div class="flex items-center space-x-3">
+            <!-- State Badge -->
+            {% if inv.state.value == 'reasoning' %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-900 text-blue-300">{{ inv.state.value }}</span>
+            {% elif inv.state.value == 'awaiting_human' %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900 text-yellow-300">{{ inv.state.value }}</span>
+            {% elif inv.state.value == 'closed' %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-green-900 text-green-300">{{ inv.state.value }}</span>
+            {% elif inv.state.value == 'failed' %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-red-900 text-red-300">{{ inv.state.value }}</span>
+            {% else %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-300">{{ inv.state.value }}</span>
+            {% endif %}
+
+            {% if inv.severity %}
+            <span class="px-3 py-1 rounded-full text-sm font-medium
+                {% if inv.severity == 'critical' %}bg-red-900 text-red-300
+                {% elif inv.severity == 'high' %}bg-orange-900 text-orange-300
+                {% elif inv.severity == 'medium' %}bg-yellow-900 text-yellow-300
+                {% else %}bg-gray-700 text-gray-400{% endif %}">
+                {{ inv.severity }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Alert Info -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h2 class="text-lg font-semibold mb-3">Alert Information</h2>
+        <dl class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+                <dt class="text-gray-400">Alert ID</dt>
+                <dd class="font-mono">{{ inv.alert_id or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-400">Tenant</dt>
+                <dd>{{ inv.tenant_id or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-400">Classification</dt>
+                <dd>{{ inv.classification or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-400">Confidence</dt>
+                <dd>{{ "%.1f"|format(inv.confidence * 100) }}%</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Entities -->
+    {% if inv.entities %}
+    <details class="bg-gray-800 rounded-lg border border-gray-700" open>
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">Entities</summary>
+        <div class="px-4 pb-4">
+            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.entities | tojson(indent=2) }}</pre>
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- IOC Matches -->
+    {% if inv.ioc_matches %}
+    <details class="bg-gray-800 rounded-lg border border-gray-700">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">IOC Matches ({{ inv.ioc_matches|length }})</summary>
+        <div class="px-4 pb-4">
+            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.ioc_matches | tojson(indent=2) }}</pre>
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- CTEM Correlations -->
+    {% if inv.ctem_exposures %}
+    <details class="bg-gray-800 rounded-lg border border-gray-700">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">CTEM Exposures ({{ inv.ctem_exposures|length }})</summary>
+        <div class="px-4 pb-4">
+            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.ctem_exposures | tojson(indent=2) }}</pre>
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- ATLAS Techniques -->
+    {% if inv.atlas_techniques %}
+    <details class="bg-gray-800 rounded-lg border border-gray-700">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">ATLAS Techniques ({{ inv.atlas_techniques|length }})</summary>
+        <div class="px-4 pb-4">
+            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.atlas_techniques | tojson(indent=2) }}</pre>
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- Scoring Breakdown -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h2 class="text-lg font-semibold mb-3">Scoring</h2>
+        <dl class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+                <dt class="text-gray-400">Risk State</dt>
+                <dd>{{ inv.risk_state }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-400">LLM Calls</dt>
+                <dd>{{ inv.llm_calls }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-400">Total Cost</dt>
+                <dd>${{ "%.4f"|format(inv.total_cost_usd) }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Decision Chain / Timeline -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h2 class="text-lg font-semibold mb-3">Decision Chain</h2>
+        <div hx-get="/api/investigations/{{ inv.investigation_id }}/timeline"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <span class="text-gray-500 text-sm">Loading timeline...</span>
+        </div>
+    </div>
+
+    <!-- Approval Buttons (if AWAITING_HUMAN) -->
+    {% if inv.state.value == 'awaiting_human' %}
+    <div class="bg-yellow-900/30 rounded-lg p-4 border border-yellow-700">
+        <h2 class="text-lg font-semibold mb-3 text-yellow-300">Action Required</h2>
+        <p class="text-sm text-gray-300 mb-4">This investigation requires human approval before proceeding.</p>
+        <div class="flex space-x-3">
+            <button hx-post="/api/investigations/{{ inv.investigation_id }}/approve"
+                    hx-swap="outerHTML"
+                    hx-confirm="Approve this investigation's recommended actions?"
+                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
+                Approve
+            </button>
+            <button hx-post="/api/investigations/{{ inv.investigation_id }}/reject"
+                    hx-swap="outerHTML"
+                    hx-confirm="Reject this investigation?"
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium">
+                Reject
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

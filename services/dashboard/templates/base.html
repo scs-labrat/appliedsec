@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ALUSKORT Dashboard{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/ws.js"></script>
+    <style>
+        [hx-indicator] .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-gray-800 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <span class="text-xl font-bold text-blue-400">ALUSKORT</span>
+                    <a href="/overview" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Overview</a>
+                    <a href="/investigations" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Investigations</a>
+                    <a href="/approvals" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Approvals</a>
+                </div>
+                <div class="text-sm text-gray-400">
+                    <span id="user-role">{% block user_info %}{% endblock %}</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

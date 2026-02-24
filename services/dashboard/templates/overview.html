@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Overview - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6" hx-get="/overview" hx-trigger="every 30s" hx-select="#metrics-grid" hx-target="#metrics-grid" hx-swap="outerHTML">
+    <h1 class="text-2xl font-bold">System Overview</h1>
+
+    <!-- Metric Cards -->
+    <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <p class="text-sm text-gray-400">Total Open</p>
+            <p class="text-3xl font-bold text-blue-400">{{ metrics.total_open }}</p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <p class="text-sm text-gray-400">Awaiting Human</p>
+            <p class="text-3xl font-bold text-yellow-400">{{ metrics.awaiting_human }}</p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <p class="text-sm text-gray-400">Critical (24h)</p>
+            <p class="text-3xl font-bold text-red-400">{{ metrics.critical_count }}</p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <p class="text-sm text-gray-400">MTTC (7d)</p>
+            <p class="text-3xl font-bold text-green-400">{{ metrics.mttc_display }}</p>
+        </div>
+    </div>
+
+    <!-- State Distribution -->
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <h2 class="text-lg font-semibold mb-3">State Distribution</h2>
+        {% set total = metrics.by_state.values()|sum if metrics.by_state else 0 %}
+        {% if total > 0 %}
+        <div class="flex h-6 rounded-full overflow-hidden bg-gray-700">
+            {% for state_name, count in metrics.by_state.items() %}
+            {% set pct = (count / total * 100) %}
+            {% if pct > 0 %}
+            <div class="
+                {% if state_name == 'reasoning' %}bg-blue-500
+                {% elif state_name == 'awaiting_human' %}bg-yellow-500
+                {% elif state_name == 'closed' %}bg-green-500
+                {% elif state_name == 'failed' %}bg-red-500
+                {% elif state_name == 'responding' %}bg-emerald-500
+                {% else %}bg-gray-500{% endif %}"
+                 style="width: {{ pct }}%"
+                 title="{{ state_name }}: {{ count }}">
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="flex flex-wrap gap-4 mt-3 text-xs text-gray-400">
+            {% for state_name, count in metrics.by_state.items() %}
+            <span>
+                <span class="inline-block w-2 h-2 rounded-full mr-1
+                    {% if state_name == 'reasoning' %}bg-blue-500
+                    {% elif state_name == 'awaiting_human' %}bg-yellow-500
+                    {% elif state_name == 'closed' %}bg-green-500
+                    {% elif state_name == 'failed' %}bg-red-500
+                    {% elif state_name == 'responding' %}bg-emerald-500
+                    {% else %}bg-gray-500{% endif %}"></span>
+                {{ state_name }}: {{ count }}
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No data available.</p>
+        {% endif %}
+    </div>
+
+    <!-- Additional Metrics Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-sm text-gray-400 mb-2">FP Rate (Closed)</h3>
+            <p class="text-2xl font-bold">{{ metrics.fp_rate }}</p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-sm text-gray-400 mb-2">Active Kill Switches</h3>
+            <p class="text-2xl font-bold {% if metrics.active_kill_switches > 0 %}text-red-400{% endif %}">
+                {{ metrics.active_kill_switches }}
+            </p>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-sm text-gray-400 mb-2">ATLAS Detections by Trust</h3>
+            {% if metrics.atlas_by_trust %}
+            <div class="space-y-1 text-sm">
+                {% for level, count in metrics.atlas_by_trust.items() %}
+                <div class="flex justify-between">
+                    <span class="text-gray-400">{{ level or 'unknown' }}</span>
+                    <span>{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No detections.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

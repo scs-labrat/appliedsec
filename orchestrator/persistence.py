@@ -102,6 +102,20 @@ class InvestigationRepository:
             new_state.value,
             agent,
         )
+
+        # Story 17-7: Publish state change for WebSocket live updates
+        try:
+            from services.dashboard.ws import notify_state_change
+
+            await notify_state_change(
+                investigation_id=state.investigation_id,
+                new_state=new_state.value,
+                updated_at=entry["timestamp"],
+            )
+        except Exception:
+            # Dashboard may not be running — non-fatal
+            pass
+
         return state
 
     async def list_by_state(
