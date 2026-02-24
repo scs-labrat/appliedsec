@@ -6,8 +6,13 @@
 #   done: Story accepted and merged
 
 project: ALUSKORT
-sprint: 1
-sprint_goal: "Epic 1 — Foundation: Shared Schemas and DB Clients"
+
+# ============================================================
+# Sprint 1: Foundation through Operations (Epics 1-11)
+# ============================================================
+sprint_1:
+  sprint_goal: "Core platform: schemas, DB clients, ingest, reasoning, intelligence, batch, and ops"
+  status: "done"
 
 development_status:
   # Epic 1: Foundation
@@ -104,3 +109,54 @@ development_status:
   11-4-cicd-pipeline: "done"
   11-5-health-checks: "done"
   11-6-operations-runbook: "done"
+
+  # ============================================================
+  # Sprint 2: Hardening & Governance (Epics 12-15)
+  # ============================================================
+  # Epic 12: LLM Resilience & Prompt Security
+  epic-12: "done"
+  12-1-taxonomy-validation: "done"
+  12-2-provider-abstraction-layer: "done"
+  12-3-secondary-provider-registration: "done"
+  12-4-provider-outage-playbook: "done"
+  12-5-prompt-compatibility-tests: "done"
+  12-6-structured-input-isolation: "done"
+  12-7-llm-as-judge-injection-classifier: "done"
+  12-8-transform-instead-of-redact: "done"
+  12-9-executor-hard-constraints: "done"
+  12-10-red-team-injection-regression-suite: "done"
+
+  # Epic 13: Audit Trail & Evidence Packaging
+  epic-13: "done"
+  13-1-audit-pydantic-models: "done"
+  13-2-audit-producer-library: "done"
+  13-3-audit-ddl-immutability: "done"
+  13-4-audit-service-core: "done"
+  13-5-evidence-artifact-store: "done"
+  13-6-evidence-package-api: "done"
+  13-7-chain-verification: "done"
+  13-8-audit-producer-integration: "done"
+  13-9-retention-lifecycle: "done"
+  13-10-audit-trail-tests: "done"
+
+  # Epic 14: FP Governance & Model Trust
+  epic-14: "done"
+  14-1-neo4j-ctem-fallback: "done"
+  14-2-fp-evaluation-framework: "done"
+  14-3-kill-switches-canary-fp: "done"
+  14-4-fp-pattern-governance: "done"
+  14-5-concept-drift-detection: "done"
+  14-6-embedding-versioning-migration: "done"
+  14-7-atlas-telemetry-trust-model: "done"
+  14-8-shadow-mode: "done"
+  14-9-canary-rollout-strategy: "done"
+
+  # Epic 15: Multi-Tenancy & Data Quality
+  epic-15: "done"
+  15-1-context-budget-scaling: "done"
+  15-2-dual-decay-incident-memory: "done"
+  15-3-multi-tenancy-isolation-tests: "done"
+  15-4-pii-redaction-completeness: "done"
+  15-5-configurable-approval-timeout: "done"
+
+  # Sprint 2 adversarial review (F1-F12): "done"
