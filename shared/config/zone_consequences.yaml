@@ -1,0 +1,25 @@
+# Zone-to-consequence-to-severity mapping — Story 14.1
+# Consolidates the two hardcoded ZONE_CONSEQUENCE_FALLBACK dicts
+# from ctem_normaliser/models.py and shared/db/neo4j_graph.py.
+#
+# Used when Neo4j is unavailable for consequence reasoning.
+
+zone_consequence:
+  Zone0_PhysicalProcess:
+    consequence_class: "safety_life"
+    severity: "CRITICAL"
+  Zone1_EdgeInference:
+    consequence_class: "equipment"
+    severity: "HIGH"
+  Zone2_Operations:
+    consequence_class: "downtime"
+    severity: "MEDIUM"
+  Zone3_Enterprise:
+    consequence_class: "data_loss"
+    severity: "LOW"
+  Zone4_External:
+    consequence_class: "data_loss"
+    severity: "LOW"
+
+default_consequence_class: "data_loss"
+default_severity: "LOW"

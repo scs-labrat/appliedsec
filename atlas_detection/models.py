@@ -1,6 +1,9 @@
-"""ATLAS detection data models — Story 9.1.
+"""ATLAS detection data models — Stories 9.1, 14.7.
 
 DetectionRule ABC and DetectionResult dataclass.
+
+Story 14.7 adds telemetry trust model: untrusted sources get
+confidence downgraded by ``TRUST_DOWNGRADE_FACTOR``.
 """
 
 from __future__ import annotations
@@ -28,6 +31,9 @@ class DetectionResult:
     requires_immediate_action: bool = False
     safety_relevant: bool = False
     timestamp: str = ""
+    # Story 14.7: Trust model fields
+    telemetry_trust_level: str = "trusted"
+    attestation_status: str = ""
 
     def __post_init__(self) -> None:
         if not self.timestamp:
@@ -45,6 +51,14 @@ SAFETY_RELEVANT_RULES: frozenset[str] = frozenset({
     "ATLAS-DETECT-004",  # Adversarial evasion
     "ATLAS-DETECT-005",  # Physics oracle DoS
     "ATLAS-DETECT-009",  # Sensor spoofing
+})
+
+# Story 14.7: Telemetry trust model
+TRUST_DOWNGRADE_FACTOR: float = 0.7
+
+UNTRUSTED_TELEMETRY_SOURCES: frozenset[str] = frozenset({
+    "edge_node_telemetry",
+    "opcua_telemetry",
 })
 
 
@@ -87,3 +101,14 @@ class DetectionRule(ABC):
         """Enforce safety confidence floors."""
         floor = SAFETY_CONFIDENCE_FLOORS.get(self.rule_id, 0.0)
         return max(confidence, floor)
+
+    def _apply_trust_downgrade(
+        self, confidence: float, source: str,
+    ) -> tuple[float, str]:
+        """Apply trust downgrade for untrusted telemetry sources.
+
+        Returns (adjusted_confidence, trust_level).
+        """
+        if source in UNTRUSTED_TELEMETRY_SOURCES:
+            return confidence * TRUST_DOWNGRADE_FACTOR, "untrusted"
+        return confidence, "trusted"

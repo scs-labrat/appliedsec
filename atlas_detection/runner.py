@@ -55,10 +55,12 @@ class DetectionRunner:
         rules: list[DetectionRule],
         db: Any,
         kafka_producer: Any | None = None,
+        audit_producer: Any | None = None,
     ) -> None:
         self._rules = rules
         self._db = db
         self._producer = kafka_producer
+        self._audit = audit_producer
 
     @property
     def rules(self) -> list[DetectionRule]:
@@ -82,6 +84,7 @@ class DetectionRunner:
 
                 alert = detection_to_alert(result)
                 await self._publish(alert)
+                self._emit_detection_fired(result)
 
         return results
 
@@ -92,6 +95,26 @@ class DetectionRunner:
             results = await self.run_rule(rule)
             all_results[rule.rule_id] = results
         return all_results
+
+    def _emit_detection_fired(self, result: DetectionResult) -> None:
+        """Emit atlas.detection_fired audit event."""
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id="system",
+                event_type="atlas.detection_fired",
+                event_category="detection",
+                actor_type="system",
+                actor_id="atlas-detection",
+                context={
+                    "rule_id": result.rule_id,
+                    "alert_title": result.alert_title,
+                    "confidence": result.confidence,
+                },
+            )
+        except Exception:
+            logger.warning("Audit emit failed for atlas.detection_fired", exc_info=True)
 
     async def _publish(self, alert: CanonicalAlert) -> None:
         """Publish alert to Kafka alerts.raw topic."""

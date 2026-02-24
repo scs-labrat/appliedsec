@@ -39,11 +39,11 @@ def _db(*fetch_many_returns, fetch_one_return=None):
 
 class TestAllRules:
     def test_registry_count(self):
-        assert len(ALL_RULES) == 10
+        assert len(ALL_RULES) == 11
 
     def test_unique_ids(self):
         ids = [r().rule_id for r in ALL_RULES]
-        assert len(set(ids)) == 10
+        assert len(set(ids)) == 11
 
     def test_all_instantiable(self):
         for cls in ALL_RULES:
@@ -517,7 +517,9 @@ class TestSensorSpoofing:
         )
         rule = SensorSpoofingRule()
         results = await rule.evaluate(db, NOW)
-        assert results[0].confidence >= 0.7
+        # Story 14.7: Trust downgrade (0.7x) applied after floor,
+        # so final confidence = 0.85 * 0.7 = 0.595
+        assert results[0].confidence == pytest.approx(0.85 * 0.7)
 
 
 # ── ATLAS-DETECT-010 Partner Compromise ───────────────────────────

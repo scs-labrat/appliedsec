@@ -1,4 +1,5 @@
-"""Qdrant vector database client wrapper with HNSW config and circuit-breaker-friendly errors."""
+"""Qdrant vector database client wrapper with HNSW config, circuit-breaker-friendly errors,
+and embedding versioning — Stories 8.1, 14.6."""
 
 from __future__ import annotations
 
@@ -22,6 +23,17 @@ COLLECTIONS = [
     "ti_report_embeddings",
 ]
 
+# Story 14.6: Embedding versioning constants
+CURRENT_EMBEDDING_MODEL: str = "text-embedding-3-large"
+CURRENT_EMBEDDING_DIMENSIONS: int = 1024
+CURRENT_EMBEDDING_VERSION: str = "2026-01"
+
+EMBEDDING_METADATA_KEYS: frozenset[str] = frozenset({
+    "embedding_model_id",
+    "embedding_dimensions",
+    "embedding_version",
+})
+
 
 class RetriableQdrantError(Exception):
     """Transient Qdrant error — upstream circuit breakers should retry."""
@@ -29,6 +41,33 @@ class RetriableQdrantError(Exception):
 
 class NonRetriableQdrantError(Exception):
     """Permanent Qdrant error — do not retry."""
+
+
+# ---- Embedding metadata helpers (Story 14.6) ----
+
+def enrich_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Add default embedding metadata to *payload* if missing.
+
+    Does not overwrite existing metadata values.
+    """
+    result = dict(payload)
+    if "embedding_model_id" not in result:
+        result["embedding_model_id"] = CURRENT_EMBEDDING_MODEL
+    if "embedding_dimensions" not in result:
+        result["embedding_dimensions"] = CURRENT_EMBEDDING_DIMENSIONS
+    if "embedding_version" not in result:
+        result["embedding_version"] = CURRENT_EMBEDDING_VERSION
+    return result
+
+
+def validate_embedding_metadata(payload: dict[str, Any]) -> None:
+    """Validate that all required embedding metadata keys are present.
+
+    Raises ``ValueError`` if any key is missing.
+    """
+    for key in ("embedding_model_id", "embedding_dimensions", "embedding_version"):
+        if key not in payload:
+            raise ValueError(f"Missing required embedding metadata key: {key}")
 
 
 class QdrantWrapper:
@@ -95,20 +134,31 @@ class QdrantWrapper:
         collection: str,
         points: list[dict[str, Any]],
         batch_size: int = 100,
+        enforce_metadata: bool = False,
     ) -> None:
         """Upsert vectors into a collection.
 
         Each point dict must have keys: id, vector, payload.
+
+        Story 14.6: When ``enforce_metadata=True``, raises ``ValueError``
+        if any point is missing required embedding metadata.  Otherwise,
+        auto-enriches payloads with default metadata.
         """
         try:
-            structs = [
-                models.PointStruct(
-                    id=p["id"],
-                    vector=p["vector"],
-                    payload=p.get("payload", {}),
+            structs = []
+            for p in points:
+                payload = p.get("payload", {})
+                if enforce_metadata:
+                    validate_embedding_metadata(payload)
+                else:
+                    payload = enrich_payload(payload)
+                structs.append(
+                    models.PointStruct(
+                        id=p["id"],
+                        vector=p["vector"],
+                        payload=payload,
+                    )
                 )
-                for p in points
-            ]
             for i in range(0, len(structs), batch_size):
                 batch = structs[i : i + batch_size]
                 self._client.upsert(collection_name=collection, points=batch)
@@ -161,6 +211,56 @@ class QdrantWrapper:
             if exc.status_code and exc.status_code >= 500:
                 raise RetriableQdrantError(str(exc)) from exc
             raise NonRetriableQdrantError(str(exc)) from exc
+
+    def search_with_version_merge(
+        self,
+        collection: str,
+        query_vector: list[float],
+        limit: int = 10,
+        prefer_version: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Search with deduplication and version preference.
+
+        Story 14.6: When multiple embedding versions exist for the same
+        ``doc_id``, deduplicates by keeping the preferred version (or
+        the newest version if no preference specified).
+        """
+        results = self._client.query_points(
+            collection_name=collection,
+            query=query_vector,
+            limit=limit * 2,  # Over-fetch to account for dedup
+        )
+
+        raw = [
+            {
+                "id": hit.id,
+                "score": hit.score,
+                "payload": hit.payload or {},
+            }
+            for hit in results.points
+        ]
+
+        # Deduplicate by doc_id
+        seen: dict[str, dict[str, Any]] = {}
+        for hit in raw:
+            doc_id = hit["payload"].get("doc_id", hit["id"])
+            existing = seen.get(doc_id)
+            if existing is None:
+                seen[doc_id] = hit
+            else:
+                # Prefer specified version, then newest version, then higher score
+                existing_ver = existing["payload"].get("embedding_version", "")
+                hit_ver = hit["payload"].get("embedding_version", "")
+                if prefer_version:
+                    if hit_ver == prefer_version and existing_ver != prefer_version:
+                        seen[doc_id] = hit
+                else:
+                    if hit_ver > existing_ver:
+                        seen[doc_id] = hit
+
+        deduped = list(seen.values())
+        deduped.sort(key=lambda x: x["score"], reverse=True)
+        return deduped[:limit]
 
     def search_by_id(
         self, collection: str, point_id: str | int

@@ -1,4 +1,4 @@
-"""Tests for IncidentScore and score_incident — AC-1.1.7."""
+"""Tests for IncidentScore and score_incident — AC-1.1.7, Story 15.2."""
 
 import math
 
@@ -8,13 +8,22 @@ from shared.schemas.scoring import (
     DELTA,
     GAMMA,
     LAMBDA,
+    SHORT_TERM_WEIGHT,
+    LONG_TERM_WEIGHT,
     IncidentScore,
     score_incident,
 )
 
 
+def _expected_dual_decay(age_days: float) -> float:
+    """Compute expected dual-decay recency for a given age."""
+    short_term = math.exp(-LAMBDA * age_days)
+    long_term = 1.0 / (1.0 + math.log(1.0 + age_days / 365.0))
+    return SHORT_TERM_WEIGHT * short_term + LONG_TERM_WEIGHT * long_term
+
+
 class TestDecayCalculation:
-    """AC-1.1.7: 30-day decay is approximately 0.5."""
+    """AC-1.1.7, Story 15.2: Dual-decay recency model."""
 
     def test_decay_at_30_days(self):
         result = score_incident(
@@ -23,7 +32,8 @@ class TestDecayCalculation:
             same_tenant=True,
             technique_overlap=1.0,
         )
-        assert abs(result.recency_decay - 0.5) < 0.01
+        expected = _expected_dual_decay(30)
+        assert abs(result.recency_decay - expected) < 0.001
 
     def test_decay_at_0_days_is_one(self):
         result = score_incident(
@@ -34,14 +44,14 @@ class TestDecayCalculation:
         )
         assert result.recency_decay == 1.0
 
-    def test_decay_at_60_days_is_quarter(self):
+    def test_decay_at_60_days(self):
         result = score_incident(
             vector_similarity=1.0,
             age_days=60,
             same_tenant=True,
             technique_overlap=1.0,
         )
-        expected = math.exp(-LAMBDA * 60)
+        expected = _expected_dual_decay(60)
         assert abs(result.recency_decay - expected) < 0.001
 
 

@@ -1,4 +1,8 @@
-"""Incident similarity scoring with time-decayed composite formula."""
+"""Incident similarity scoring with dual-decay composite formula — Stories 7.5, 15.2.
+
+Story 15.2 replaces single exponential decay with a dual-decay model
+that preserves long-term incident memory for recurring threat patterns.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,13 @@ DELTA = 0.15  # technique overlap
 
 # Decay constant: exp(-0.023 * 30) ~ 0.5, so ~30 day half-life
 LAMBDA = 0.023
+
+# Story 15.2: Dual-decay weights
+SHORT_TERM_WEIGHT: float = 0.7  # Weight of exponential decay term
+LONG_TERM_WEIGHT: float = 0.3   # Weight of logarithmic decay term
+
+# Story 15.2: Rare-but-important floor
+RARE_IMPORTANT_FLOOR: float = 0.1  # Minimum recency for flagged incidents
 
 
 class IncidentScore(BaseModel):
@@ -31,17 +42,29 @@ def score_incident(
     age_days: float,
     same_tenant: bool,
     technique_overlap: float,
+    is_rare_important: bool = False,
 ) -> IncidentScore:
     """Compute composite relevance score for a past incident.
 
-    score = ALPHA * vector_similarity
-          + BETA  * recency_decay
-          + GAMMA * tenant_match
-          + DELTA * technique_overlap
+    Story 15.2: Uses dual-decay recency model:
+        recency = SHORT_TERM_WEIGHT * exp(-LAMBDA * age_days)
+               + LONG_TERM_WEIGHT * 1/(1 + log(1 + age_days/365))
 
-    recency_decay = exp(-LAMBDA * age_days)
+    The long-term logarithmic component preserves memory of recurring
+    threats that single exponential decay would erase.
+
+    If ``is_rare_important`` is True, recency is floored at
+    ``RARE_IMPORTANT_FLOOR`` to keep flagged incidents rankable.
     """
-    recency_decay = math.exp(-LAMBDA * age_days)
+    # Dual-decay recency
+    short_term = math.exp(-LAMBDA * age_days)
+    long_term = 1.0 / (1.0 + math.log(1.0 + age_days / 365.0))
+    recency_decay = SHORT_TERM_WEIGHT * short_term + LONG_TERM_WEIGHT * long_term
+
+    # Story 15.2: Rare-but-important floor
+    if is_rare_important:
+        recency_decay = max(recency_decay, RARE_IMPORTANT_FLOOR)
+
     tenant_match = 1.0 if same_tenant else 0.0
 
     composite = (

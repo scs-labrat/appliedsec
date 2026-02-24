@@ -144,7 +144,7 @@ class TestServiceMetricsMap:
 
 class TestAllMetrics:
     def test_total_count(self):
-        expected = (5 + 3 + 3 + 5 + 2 + 3 + 3 + 3 + 2)
+        expected = (5 + 3 + 3 + 5 + 2 + 3 + 3 + 3 + 2 + 2 + 4)
         assert len(ALL_METRICS) == expected
 
     def test_all_have_aluskort_prefix(self):

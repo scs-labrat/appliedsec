@@ -233,6 +233,51 @@ KAFKA_METRICS: list[MetricDef] = [
     ),
 ]
 
+# ── Drift Detection metrics ──────────────────────────────────────
+
+DRIFT_DETECTION_METRICS: list[MetricDef] = [
+    MetricDef(
+        name="aluskort_fp_drift_score",
+        metric_type=MetricType.GAUGE,
+        description="FP drift score per rule family and dimension",
+        labels=("rule_family", "dimension"),
+    ),
+    MetricDef(
+        name="aluskort_fp_confidence_threshold",
+        metric_type=MetricType.GAUGE,
+        description="Current FP confidence threshold (normal or elevated)",
+    ),
+]
+
+# ── FP Evaluation metrics ────────────────────────────────────────
+
+FP_EVALUATION_METRICS: list[MetricDef] = [
+    MetricDef(
+        name="aluskort_fp_precision",
+        metric_type=MetricType.GAUGE,
+        description="FP pattern precision per rule family",
+        labels=("rule_family",),
+    ),
+    MetricDef(
+        name="aluskort_fp_recall",
+        metric_type=MetricType.GAUGE,
+        description="FP pattern recall per rule family",
+        labels=("rule_family",),
+    ),
+    MetricDef(
+        name="aluskort_fp_false_negative_rate",
+        metric_type=MetricType.GAUGE,
+        description="FP pattern false negative rate per rule family",
+        labels=("rule_family",),
+    ),
+    MetricDef(
+        name="aluskort_fp_evaluation_sample_size",
+        metric_type=MetricType.GAUGE,
+        description="FP evaluation sample size per rule family",
+        labels=("rule_family",),
+    ),
+]
+
 # ── Sentinel Adapter metrics ─────────────────────────────────────
 
 SENTINEL_ADAPTER_METRICS: list[MetricDef] = [
@@ -273,6 +318,8 @@ ALL_METRICS: list[MetricDef] = (
     + BATCH_SCHEDULER_METRICS
     + KAFKA_METRICS
     + SENTINEL_ADAPTER_METRICS
+    + DRIFT_DETECTION_METRICS
+    + FP_EVALUATION_METRICS
 )
 
 SERVICES = list(SERVICE_METRICS.keys())

@@ -663,6 +663,98 @@ class SensorSpoofingRule(DetectionRule):
                     requires_immediate_action=True,
                     safety_relevant=True,
                 ))
+
+        # Story 14.7: Apply trust downgrade for OPC-UA telemetry
+        for r in results:
+            conf, trust = self._apply_trust_downgrade(r.confidence, "opcua_telemetry")
+            r.confidence = conf
+            r.telemetry_trust_level = trust
+            r.attestation_status = "unavailable"
+
+        return results
+
+
+# ===========================================================================
+# ATLAS-DETECT-011 — Edge Node Compromise (TM-04)
+# ===========================================================================
+
+class EdgeCompromiseRule(DetectionRule):
+    """Detect compromised edge nodes via attestation and resource anomalies."""
+
+    rule_id = "ATLAS-DETECT-011"
+    frequency = timedelta(minutes=5)
+    lookback = timedelta(minutes=15)
+
+    CPU_THRESHOLD = 0.95
+    MEMORY_THRESHOLD = 0.95
+
+    async def evaluate(self, db: Any, now: datetime | None = None) -> list[DetectionResult]:
+        now = now or datetime.now(timezone.utc)
+        start = now - self.lookback
+
+        rows = await db.fetch_many(
+            """
+            SELECT edge_node_id, boot_attestation, model_weight_hash,
+                   disk_integrity, cpu_utilisation, memory_utilisation
+            FROM edge_node_telemetry
+            WHERE ts >= $1 AND ts < $2
+            """,
+            start, now,
+        )
+
+        results: list[DetectionResult] = []
+        for row in rows:
+            node_id = row["edge_node_id"]
+            attestation = row.get("boot_attestation", "")
+            disk = row.get("disk_integrity", "ok")
+            cpu = row.get("cpu_utilisation", 0.0)
+            memory = row.get("memory_utilisation", 0.0)
+
+            triggered = False
+            evidence: dict[str, Any] = {"edge_node_id": node_id}
+
+            if attestation == "fail":
+                triggered = True
+                evidence["boot_attestation"] = "fail"
+            elif not attestation:
+                triggered = True
+                evidence["boot_attestation"] = "unavailable"
+
+            if disk == "fail":
+                triggered = True
+                evidence["disk_integrity"] = "fail"
+
+            if cpu > self.CPU_THRESHOLD:
+                triggered = True
+                evidence["cpu_utilisation"] = cpu
+
+            if memory > self.MEMORY_THRESHOLD:
+                triggered = True
+                evidence["memory_utilisation"] = memory
+
+            if triggered:
+                confidence = self._apply_confidence_floor(0.85)
+                # Apply trust downgrade for edge node telemetry
+                conf, trust = self._apply_trust_downgrade(confidence, "edge_node_telemetry")
+
+                att_status = attestation if attestation else "unavailable"
+
+                results.append(DetectionResult(
+                    rule_id=self.rule_id,
+                    triggered=True,
+                    alert_title=f"Edge node compromise detected on {node_id}",
+                    alert_severity="Critical",
+                    atlas_technique="AML.T0040",
+                    attack_technique="T1195.002",
+                    threat_model_ref="TM-04",
+                    confidence=conf,
+                    evidence=evidence,
+                    entities=[{"type": "host", "id": node_id}],
+                    requires_immediate_action=True,
+                    safety_relevant=False,
+                    telemetry_trust_level=trust,
+                    attestation_status=att_status,
+                ))
         return results
 
 
@@ -771,4 +863,5 @@ ALL_RULES: list[type[DetectionRule]] = [
     AlertFatigueRule,
     SensorSpoofingRule,
     PartnerCompromiseRule,
+    EdgeCompromiseRule,
 ]

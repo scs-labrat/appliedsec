@@ -54,6 +54,43 @@ class EntityParserService:
             "bootstrap.servers": kafka_bootstrap,
         })
         self._running = False
+        self.audit_producer = None
+
+    def _emit_audit_classified(self, alert_data: dict[str, Any]) -> None:
+        """Emit alert.classified audit event (fire-and-forget)."""
+        if self.audit_producer is None:
+            return
+        try:
+            self.audit_producer.emit(
+                tenant_id=alert_data.get("tenant_id", "unknown"),
+                event_type="alert.classified",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="entity-parser",
+                alert_id=alert_data.get("alert_id", ""),
+            )
+        except Exception:
+            logger.warning("Audit emit failed for alert.classified", exc_info=True)
+
+    def _emit_audit_injection(
+        self, tenant_id: str, alert_id: str, detection_count: int,
+    ) -> None:
+        """Emit injection.detected audit event (fire-and-forget)."""
+        if self.audit_producer is None:
+            return
+        try:
+            self.audit_producer.emit(
+                tenant_id=tenant_id,
+                event_type="injection.detected",
+                event_category="security",
+                actor_type="system",
+                actor_id="entity-parser",
+                severity="warning",
+                alert_id=alert_id,
+                context={"detection_count": detection_count},
+            )
+        except Exception:
+            logger.warning("Audit emit failed for injection.detected", exc_info=True)
 
     def start(self) -> None:
         """Subscribe and begin processing."""

@@ -36,7 +36,10 @@ class FPPatternStatus(str, Enum):
     PENDING_REVIEW = "pending_review"
     APPROVED = "approved"
     ACTIVE = "active"
+    SHADOW = "shadow"
     DEPRECATED = "deprecated"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
 
 
 @dataclass
@@ -102,9 +105,17 @@ class FPPattern:
     confidence: float = 0.0
     status: str = FPPatternStatus.PENDING_REVIEW.value
     approved_by: str = ""
+    approved_by_1: str = ""
+    approved_by_2: str = ""
     approval_date: str = ""
+    expiry_date: str = ""
+    reaffirmed_date: str = ""
+    reaffirmed_by: str = ""
     reason: str = ""
     false_positive_count: int = 0
+    scope_rule_family: str = ""
+    scope_tenant_id: str = ""
+    scope_asset_class: str = ""
     source_investigations: list[str] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""

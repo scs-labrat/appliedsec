@@ -99,7 +99,9 @@ class TestUpsertVectors:
         assert len(call_kwargs["points"]) == 2
         assert call_kwargs["points"][0].id == "p1"
         assert call_kwargs["points"][0].vector == [0.1, 0.2, 0.3]
-        assert call_kwargs["points"][0].payload == {"tenant_id": "t1"}
+        # Story 14.6: auto-enrichment adds embedding metadata
+        assert call_kwargs["points"][0].payload["tenant_id"] == "t1"
+        assert "embedding_model_id" in call_kwargs["points"][0].payload
 
 
 class TestSearch:

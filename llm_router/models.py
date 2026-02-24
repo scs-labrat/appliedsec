@@ -1,6 +1,7 @@
-"""LLM Router data models — Story 6.1.
+"""LLM Router data models — Stories 6.1, 12.2, 12.3, 12.4.
 
-Defines tiers, model configs, routing decisions, and task context.
+Defines tiers, model configs, routing decisions, task context,
+fallback registry, and degradation policies.
 """
 
 from __future__ import annotations
@@ -8,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+from shared.schemas.routing import LLMProvider, ModelConfig
 
 
 class ModelTier(str, Enum):
@@ -19,49 +22,78 @@ class ModelTier(str, Enum):
     TIER_2 = "tier_2"       # Sonnet Batch — offline
 
 
-@dataclass
-class AnthropicModelConfig:
-    """Per-model capabilities and pricing."""
-
-    model_id: str
-    max_context_tokens: int
-    cost_per_mtok_input: float
-    cost_per_mtok_output: float
-    supports_extended_thinking: bool = False
-    supports_tool_use: bool = True
-    supports_prompt_caching: bool = True
-    batch_eligible: bool = False
+# Legacy alias for backward compatibility
+AnthropicModelConfig = ModelConfig
 
 
 # ---- model registry --------------------------------------------------------
 
-MODEL_REGISTRY: dict[ModelTier, AnthropicModelConfig] = {
-    ModelTier.TIER_0: AnthropicModelConfig(
+MODEL_REGISTRY: dict[ModelTier, ModelConfig] = {
+    ModelTier.TIER_0: ModelConfig(
+        provider=LLMProvider.ANTHROPIC,
         model_id="claude-haiku-4-5-20251001",
         max_context_tokens=200_000,
         cost_per_mtok_input=0.80,
         cost_per_mtok_output=4.0,
     ),
-    ModelTier.TIER_1: AnthropicModelConfig(
+    ModelTier.TIER_1: ModelConfig(
+        provider=LLMProvider.ANTHROPIC,
         model_id="claude-sonnet-4-5-20250929",
         max_context_tokens=200_000,
         cost_per_mtok_input=3.0,
         cost_per_mtok_output=15.0,
     ),
-    ModelTier.TIER_1_PLUS: AnthropicModelConfig(
+    ModelTier.TIER_1_PLUS: ModelConfig(
+        provider=LLMProvider.ANTHROPIC,
         model_id="claude-opus-4-6",
         max_context_tokens=200_000,
         cost_per_mtok_input=15.0,
         cost_per_mtok_output=75.0,
         supports_extended_thinking=True,
     ),
-    ModelTier.TIER_2: AnthropicModelConfig(
+    ModelTier.TIER_2: ModelConfig(
+        provider=LLMProvider.ANTHROPIC,
         model_id="claude-sonnet-4-5-20250929",
         max_context_tokens=200_000,
         cost_per_mtok_input=1.5,
         cost_per_mtok_output=7.5,
         batch_eligible=True,
     ),
+}
+
+
+# ---- fallback registry (Story 12.3) ----------------------------------------
+
+FALLBACK_REGISTRY: dict[ModelTier, list[ModelConfig]] = {
+    ModelTier.TIER_0: [
+        ModelConfig(
+            provider=LLMProvider.OPENAI,
+            model_id="gpt-4o-mini",
+            max_context_tokens=128_000,
+            cost_per_mtok_input=0.15,
+            cost_per_mtok_output=0.60,
+        ),
+    ],
+    ModelTier.TIER_1: [
+        ModelConfig(
+            provider=LLMProvider.OPENAI,
+            model_id="gpt-4o",
+            max_context_tokens=128_000,
+            cost_per_mtok_input=2.50,
+            cost_per_mtok_output=10.0,
+        ),
+    ],
+    ModelTier.TIER_1_PLUS: [
+        ModelConfig(
+            provider=LLMProvider.OPENAI,
+            model_id="gpt-4o",
+            max_context_tokens=128_000,
+            cost_per_mtok_input=2.50,
+            cost_per_mtok_output=10.0,
+            supports_extended_thinking=False,
+        ),
+    ],
+    ModelTier.TIER_2: [],  # Batch tier has no fallback
 }
 
 
@@ -85,12 +117,14 @@ class RoutingDecision:
     """Output of the router — the selected model and parameters."""
 
     tier: ModelTier
-    model_config: AnthropicModelConfig
+    model_config: ModelConfig
     max_tokens: int
     temperature: float
     use_extended_thinking: bool = False
     use_prompt_caching: bool = True
     reason: str = ""
+    fallback_configs: list[ModelConfig] = field(default_factory=list)
+    degradation_level: str = "full_capability"
 
 
 # ---- default parameters per tier -------------------------------------------
@@ -111,4 +145,49 @@ SEVERITY_QUEUE_MAP: dict[str, str] = {
     "medium": "jobs.llm.priority.normal",
     "low": "jobs.llm.priority.low",
     "informational": "jobs.llm.priority.low",
+}
+
+
+# ---- degradation levels (Story 12.4) --------------------------------------
+
+class DegradationLevel(str, Enum):
+    """System degradation levels based on provider health."""
+
+    FULL_CAPABILITY = "full_capability"
+    SECONDARY_ACTIVE = "secondary_active"
+    DETERMINISTIC_ONLY = "deterministic_only"
+
+
+@dataclass
+class DegradationPolicy:
+    """Policy settings for each degradation level."""
+
+    level: DegradationLevel
+    confidence_threshold_override: float = 0.0
+    extended_thinking_available: bool = True
+    max_tier: ModelTier = ModelTier.TIER_1_PLUS
+    alert_ops: bool = False
+
+
+DEGRADATION_POLICIES: dict[DegradationLevel, DegradationPolicy] = {
+    DegradationLevel.FULL_CAPABILITY: DegradationPolicy(
+        level=DegradationLevel.FULL_CAPABILITY,
+        confidence_threshold_override=0.0,
+        extended_thinking_available=True,
+        max_tier=ModelTier.TIER_1_PLUS,
+    ),
+    DegradationLevel.SECONDARY_ACTIVE: DegradationPolicy(
+        level=DegradationLevel.SECONDARY_ACTIVE,
+        confidence_threshold_override=0.95,
+        extended_thinking_available=False,
+        max_tier=ModelTier.TIER_1,
+        alert_ops=True,
+    ),
+    DegradationLevel.DETERMINISTIC_ONLY: DegradationPolicy(
+        level=DegradationLevel.DETERMINISTIC_ONLY,
+        confidence_threshold_override=1.0,
+        extended_thinking_available=False,
+        max_tier=ModelTier.TIER_0,
+        alert_ops=True,
+    ),
 }

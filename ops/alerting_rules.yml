@@ -1,0 +1,53 @@
+groups:
+  - name: aluskort-audit-chain
+    rules:
+      - alert: AluskortAuditChainBroken
+        expr: aluskort_audit_chain_valid == 0
+        for: 0m
+        labels:
+          severity: critical
+          component: audit-service
+        annotations:
+          summary: "Audit chain integrity broken for tenant {{ $labels.tenant_id }}"
+          description: >-
+            The {{ $labels.check_type }} verification detected a hash chain
+            integrity failure for tenant {{ $labels.tenant_id }}.
+            Immediate investigation required — potential tampering or data corruption.
+
+      - alert: AluskortAuditLagHigh
+        expr: aluskort_audit_kafka_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: audit-service
+        annotations:
+          summary: "Audit Kafka lag high for tenant {{ $labels.tenant_id }}"
+          description: >-
+            Kafka offset exceeds Postgres max(sequence_number) by more than 1000
+            for tenant {{ $labels.tenant_id }}. Current lag: {{ $value }}.
+            This indicates audit events are being produced faster than consumed.
+
+      - alert: AluskortAuditIntegrityFailed
+        expr: aluskort_audit_chain_valid{check_type="daily_full"} == 0
+        for: 0m
+        labels:
+          severity: critical
+          component: audit-service
+        annotations:
+          summary: "Daily full chain verification failed for {{ $labels.tenant_id }}"
+          description: >-
+            The daily full chain verification found integrity issues for
+            tenant {{ $labels.tenant_id }}. Review audit_verification_log
+            for details.
+
+      - alert: AluskortAuditColdCorruption
+        expr: aluskort_audit_chain_valid{check_type="weekly_cold"} == 0
+        for: 0m
+        labels:
+          severity: critical
+          component: audit-service
+        annotations:
+          summary: "Weekly cold storage spot-check failed for {{ $labels.tenant_id }}"
+          description: >-
+            Random sample of 100 records from cold storage failed hash verification
+            for tenant {{ $labels.tenant_id }}. Possible cold storage corruption.

@@ -71,7 +71,9 @@ class TestAnthropicModelConfig:
             assert cfg.max_context_tokens == 200_000
 
     def test_custom_config(self):
+        from shared.schemas.routing import LLMProvider
         cfg = AnthropicModelConfig(
+            provider=LLMProvider.ANTHROPIC,
             model_id="test-model",
             max_context_tokens=100_000,
             cost_per_mtok_input=1.0,

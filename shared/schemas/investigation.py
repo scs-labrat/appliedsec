@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -32,6 +33,25 @@ class AgentRole(str, Enum):
     ATLAS_MAPPER = "atlas_mapper"
 
 
+@dataclass
+class DecisionEntry:
+    """Record of a decision point in the investigation workflow.
+
+    Story 14.7 adds ``attestation_status`` for trust model tracking.
+    """
+
+    step: str = ""
+    agent: str = ""
+    action: str = ""
+    reasoning: str = ""
+    confidence: float = 0.0
+    attestation_status: str = ""
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like access for backward compatibility with dict entries."""
+        return getattr(self, key, default)
+
+
 class GraphState(BaseModel):
     """Explicit state object persisted to Postgres for each investigation."""
 
@@ -56,3 +76,4 @@ class GraphState(BaseModel):
     llm_calls: int = 0
     total_cost_usd: float = 0.0
     queries_executed: int = Field(default=0)
+    case_facts: dict[str, Any] = Field(default_factory=dict)

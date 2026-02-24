@@ -50,11 +50,13 @@ class CTEMNormaliserService:
         kafka_consumer: Any | None = None,
         kafka_producer: Any | None = None,
         neo4j_client: Any | None = None,
+        audit_producer: Any | None = None,
     ) -> None:
         self._repo = repository
         self._consumer = kafka_consumer
         self._producer = kafka_producer
         self._neo4j = neo4j_client
+        self._audit = audit_producer
         self._normalisers: dict[str, BaseNormaliser] = {}
         self._init_normalisers()
 
@@ -111,6 +113,9 @@ class CTEMNormaliserService:
         # Publish to normalised topic
         await self._publish_normalised(exposure)
 
+        # Emit audit event
+        self._emit_audit(exposure)
+
         return exposure
 
     async def _publish_normalised(self, exposure: CTEMExposure) -> None:
@@ -127,6 +132,25 @@ class CTEMNormaliserService:
                 "Failed to publish normalised exposure %s",
                 exposure.exposure_key, exc_info=True,
             )
+
+    def _emit_audit(self, exposure: CTEMExposure) -> None:
+        """Emit ctem.exposure_scored audit event (fire-and-forget)."""
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=getattr(exposure, "tenant_id", "system"),
+                event_type="ctem.exposure_scored",
+                event_category="decision",
+                actor_type="system",
+                actor_id="ctem-normaliser",
+                context={
+                    "exposure_key": exposure.exposure_key,
+                    "severity": getattr(exposure, "severity", ""),
+                },
+            )
+        except Exception:
+            logger.warning("Audit emit failed for ctem.exposure_scored", exc_info=True)
 
     async def _send_to_dlq(
         self,
