@@ -36,10 +36,12 @@ class BatchResultProcessor:
         postgres_client: Any,
         kafka_producer: Any | None = None,
         redis_client: Any | None = None,
+        audit_producer: Any | None = None,
     ) -> None:
         self._db = postgres_client
         self._producer = kafka_producer
         self._redis = redis_client
+        self._audit = audit_producer
 
     async def process_job(self, job: BatchJob) -> dict[str, int]:
         """Process all results in a completed batch job.
@@ -69,11 +71,19 @@ class BatchResultProcessor:
                 if task_type == BatchTaskType.FP_PATTERN_GENERATION.value:
                     pattern = self._parse_fp_pattern(result["content"], task)
                     await self._store_fp_pattern(pattern)
+                    self._emit_audit("fp_pattern.created", {
+                        "pattern_id": pattern.pattern_id,
+                        "alert_name": pattern.alert_name,
+                    })
                     summary["fp_patterns_stored"] += 1
 
                 elif task_type == BatchTaskType.PLAYBOOK_GENERATION.value:
                     draft = self._parse_playbook_draft(result["content"], task)
                     await self._publish_playbook(draft)
+                    self._emit_audit("playbook.generated", {
+                        "playbook_id": draft.playbook_id,
+                        "name": draft.name,
+                    })
                     summary["playbooks_published"] += 1
                 else:
                     logger.warning("Unknown task type: %s", task_type)
@@ -160,6 +170,7 @@ class BatchResultProcessor:
         self,
         pattern_id: str,
         approved_by: str,
+        tenant_id: str = "default",
     ) -> None:
         """Approve an FP pattern and push to Redis hot cache + Kafka."""
         now = datetime.now(timezone.utc).isoformat()
@@ -187,7 +198,7 @@ class BatchResultProcessor:
                 "confidence": row.get("confidence", 0.0),
                 "status": "approved",
             }
-            await self._redis.set_fp_pattern(pattern_id, cache_entry)
+            await self._redis.set_fp_pattern(tenant_id, pattern_id, cache_entry)
             logger.info("FP pattern %s pushed to Redis hot cache", pattern_id)
 
         if row and self._producer:
@@ -216,6 +227,22 @@ class BatchResultProcessor:
             logger.warning(
                 "Failed to publish playbook %s", draft.playbook_id, exc_info=True,
             )
+
+    def _emit_audit(self, event_type: str, context: dict[str, Any]) -> None:
+        """Emit audit event via AuditProducer (fire-and-forget)."""
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id="system",
+                event_type=event_type,
+                event_category="action",
+                actor_type="system",
+                actor_id="batch-scheduler",
+                context=context,
+            )
+        except Exception:
+            logger.warning("Audit emit failed for %s", event_type, exc_info=True)
 
     async def _publish_audit(
         self, job: BatchJob, summary: dict[str, int]

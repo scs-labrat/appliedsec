@@ -1,12 +1,16 @@
-"""PII redaction with reversible mapping — Story 5.2.
+"""PII redaction with reversible mapping — Stories 5.2, 15.4.
 
 Replaces real entity values with placeholders (``USER_001``,
 ``IP_SRC_001``, ``HOST_001``, …) before sending content to the LLM,
 and restores them after the response is received.
+
+Story 15.4 extends detection to usernames in hostnames, file paths,
+and chat handles, and adds encrypted redaction map storage.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -15,6 +19,30 @@ _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _EMAIL_RE = re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b")
 _UPN_RE = _EMAIL_RE  # UPNs look like emails
 _HOSTNAME_RE = re.compile(r"\b[A-Z][A-Z0-9_-]{2,15}(?:\.[a-zA-Z0-9.-]+)?\b")
+
+# Story 15.4: Extended PII patterns
+_USERNAME_IN_HOSTNAME_RE = re.compile(
+    r"\b[A-Za-z][A-Za-z0-9]{1,19}[-_][A-Za-z]{2,15}(?:\d{1,3})?\b"
+)
+_FILE_PATH_USERNAME_RE = re.compile(
+    r"(?:/home/|/Users/|[A-Za-z]:\\Users\\)([a-zA-Z][a-zA-Z0-9._-]{1,20})"
+)
+_CHAT_HANDLE_RE = re.compile(r"@[a-zA-Z][a-zA-Z0-9._-]{1,20}\b")
+
+# F3: Common infrastructure words that should not trigger hostname-username redaction
+_HOSTNAME_EXCLUSIONS = frozenset({
+    "SERVER", "ROUTER", "SWITCH", "PRINTER", "BUILD", "TEST",
+    "PROD", "DEV", "STAGE", "STAGING", "BACKUP", "PROXY",
+    "GATEWAY", "MONITOR", "ADMIN", "NODE", "WORKER", "MASTER",
+    "SLAVE", "PRIMARY", "SECONDARY", "REPLICA", "CLUSTER",
+})
+
+# F4: ECS/Elastic field names that should not trigger chat handle redaction
+_ECS_FIELD_EXCLUSIONS = frozenset({
+    "@timestamp", "@version", "@metadata",
+    "@message", "@fields", "@source",
+    "@tags", "@type",
+})
 
 
 @dataclass
@@ -92,6 +120,31 @@ def redact_pii(
         placeholder = redaction_map.get_or_create(match, "USER")
         text = text.replace(match, placeholder)
 
+    # Story 15.4: hostname-with-username (e.g. JSMITH-LAPTOP)
+    # F3: skip matches where second segment is a common infra word
+    for match in _USERNAME_IN_HOSTNAME_RE.findall(text):
+        parts = re.split(r"[-_]", match, maxsplit=1)
+        if len(parts) == 2 and parts[1].upper().rstrip("0123456789") in _HOSTNAME_EXCLUSIONS:
+            continue
+        placeholder = redaction_map.get_or_create(match, "HOST")
+        text = text.replace(match, placeholder)
+
+    # Story 15.4: file path usernames (e.g. /home/jsmith/)
+    for m in list(_FILE_PATH_USERNAME_RE.finditer(text)):
+        full_match = m.group(0)
+        username = m.group(1)
+        placeholder = redaction_map.get_or_create(username, "USER")
+        replacement = full_match.replace(username, placeholder, 1)
+        text = text.replace(full_match, replacement, 1)
+
+    # Story 15.4: chat handles (e.g. @jsmith)
+    # F4: skip ECS field names like @timestamp, @version
+    for match in _CHAT_HANDLE_RE.findall(text):
+        if match.lower() in _ECS_FIELD_EXCLUSIONS:
+            continue
+        placeholder = redaction_map.get_or_create(match, "USER")
+        text = text.replace(match, placeholder)
+
     return text, redaction_map
 
 
@@ -106,3 +159,51 @@ def deanonymise_text(text: str, redaction_map: RedactionMap) -> str:
         real = redaction_map.reverse_mappings[placeholder]
         text = text.replace(placeholder, real)
     return text
+
+
+# ---- Secure redaction map storage (Story 15.4) --------------------------------
+
+def encrypt_redaction_map(redaction_map: RedactionMap, key: bytes) -> bytes:
+    """Encrypt a redaction map using Fernet symmetric encryption.
+
+    The key should come from ``PII_REDACTION_KEY`` env var or a KMS.
+    """
+    from cryptography.fernet import Fernet
+
+    fernet = Fernet(key)
+    payload = json.dumps({
+        "forward": redaction_map.mappings,
+        "reverse": redaction_map.reverse_mappings,
+        "counters": dict(redaction_map._counters),
+    }).encode("utf-8")
+    return fernet.encrypt(payload)
+
+
+def decrypt_redaction_map(encrypted: bytes, key: bytes) -> RedactionMap:
+    """Decrypt a redaction map for audit re-identification.
+
+    Raises ``cryptography.fernet.InvalidToken`` if the key is wrong.
+    """
+    from cryptography.fernet import Fernet
+
+    fernet = Fernet(key)
+    payload = fernet.decrypt(encrypted)
+    data = json.loads(payload.decode("utf-8"))
+
+    rm = RedactionMap()
+    rm._forward = data["forward"]
+    rm._reverse = data["reverse"]
+    # F10: restore counters directly if present, else reconstruct from forward map
+    if "counters" in data:
+        rm._counters = data["counters"]
+    else:
+        for placeholder in rm._forward.values():
+            parts = placeholder.rsplit("_", 1)
+            if len(parts) == 2:
+                prefix, num = parts
+                try:
+                    count = int(num)
+                    rm._counters[prefix] = max(rm._counters.get(prefix, 0), count)
+                except ValueError:
+                    pass
+    return rm

@@ -30,6 +30,7 @@ def fp(mock_redis):
 def state():
     return GraphState(
         investigation_id="inv-001",
+        tenant_id="tenant-A",
         entities={
             "accounts": [{"primary_value": "service-account-01"}],
             "ips": [{"primary_value": "10.0.1.50"}],
@@ -45,7 +46,7 @@ class TestFPCheck:
 
     @pytest.mark.asyncio
     async def test_matching_pattern(self, fp, state, mock_redis):
-        mock_redis.list_fp_patterns.return_value = ["fp:FP-001"]
+        mock_redis.list_fp_patterns.return_value = ["fp:tenant-A:FP-001"]
         mock_redis.get_fp_pattern.return_value = {
             "pattern_id": "FP-001",
             "alert_name_regex": ".*Exchange.*Unusual Activity.*",
@@ -64,7 +65,7 @@ class TestFPCheck:
 
     @pytest.mark.asyncio
     async def test_unapproved_pattern_skipped(self, fp, state, mock_redis):
-        mock_redis.list_fp_patterns.return_value = ["fp:FP-002"]
+        mock_redis.list_fp_patterns.return_value = ["fp:tenant-A:FP-002"]
         mock_redis.get_fp_pattern.return_value = {
             "pattern_id": "FP-002",
             "alert_name_regex": ".*",
@@ -76,7 +77,7 @@ class TestFPCheck:
 
     @pytest.mark.asyncio
     async def test_low_confidence_no_match(self, fp, state, mock_redis):
-        mock_redis.list_fp_patterns.return_value = ["fp:FP-003"]
+        mock_redis.list_fp_patterns.return_value = ["fp:tenant-A:FP-003"]
         mock_redis.get_fp_pattern.return_value = {
             "pattern_id": "FP-003",
             "alert_name_regex": ".*Totally Different.*",
@@ -90,7 +91,7 @@ class TestFPCheck:
 
     @pytest.mark.asyncio
     async def test_cidr_entity_match(self, fp, state, mock_redis):
-        mock_redis.list_fp_patterns.return_value = ["fp:FP-004"]
+        mock_redis.list_fp_patterns.return_value = ["fp:tenant-A:FP-004"]
         mock_redis.get_fp_pattern.return_value = {
             "pattern_id": "FP-004",
             "alert_name_regex": ".*",
@@ -104,7 +105,7 @@ class TestFPCheck:
 
     @pytest.mark.asyncio
     async def test_tracks_queries(self, fp, state, mock_redis):
-        mock_redis.list_fp_patterns.return_value = ["fp:FP-001"]
+        mock_redis.list_fp_patterns.return_value = ["fp:tenant-A:FP-001"]
         mock_redis.get_fp_pattern.return_value = {
             "status": "approved",
             "alert_name_regex": "nope",

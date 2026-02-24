@@ -75,13 +75,14 @@ class RedisClient:
 
     async def set_ioc(
         self,
+        tenant_id: str,
         ioc_type: str,
         value: str,
         data: dict[str, Any],
         confidence: float,
     ) -> None:
-        """Cache an IOC with confidence-based TTL."""
-        key = f"ioc:{ioc_type}:{value}"
+        """Cache an IOC with confidence-based TTL (tenant-scoped key)."""
+        key = f"ioc:{tenant_id}:{ioc_type}:{value}"
         ttl = _compute_ttl(confidence)
         try:
             await self._client.set(key, json.dumps(data), ex=ttl)  # type: ignore[union-attr]
@@ -89,10 +90,10 @@ class RedisClient:
             logger.warning("Redis set_ioc failed for %s", key, exc_info=True)
 
     async def get_ioc(
-        self, ioc_type: str, value: str
+        self, tenant_id: str, ioc_type: str, value: str
     ) -> Optional[dict[str, Any]]:
         """Get a cached IOC. Returns None on miss or connection error (fail-open)."""
-        key = f"ioc:{ioc_type}:{value}"
+        key = f"ioc:{tenant_id}:{ioc_type}:{value}"
         try:
             raw = await self._client.get(key)  # type: ignore[union-attr]
             if raw is None:
@@ -102,9 +103,9 @@ class RedisClient:
             logger.warning("Redis get_ioc failed for %s", key, exc_info=True)
             return None
 
-    async def delete_ioc(self, ioc_type: str, value: str) -> bool:
+    async def delete_ioc(self, tenant_id: str, ioc_type: str, value: str) -> bool:
         """Delete a cached IOC. Returns True if deleted."""
-        key = f"ioc:{ioc_type}:{value}"
+        key = f"ioc:{tenant_id}:{ioc_type}:{value}"
         try:
             result = await self._client.delete(key)  # type: ignore[union-attr]
             return result > 0
@@ -116,22 +117,23 @@ class RedisClient:
 
     async def set_fp_pattern(
         self,
+        tenant_id: str,
         pattern_id: str,
         pattern_data: dict[str, Any],
         ttl: int = 86_400,
     ) -> None:
-        """Cache a false positive pattern."""
-        key = f"fp:{pattern_id}"
+        """Cache a false positive pattern (tenant-scoped key)."""
+        key = f"fp:{tenant_id}:{pattern_id}"
         try:
             await self._client.set(key, json.dumps(pattern_data), ex=ttl)  # type: ignore[union-attr]
         except Exception:
             logger.warning("Redis set_fp_pattern failed for %s", key, exc_info=True)
 
     async def get_fp_pattern(
-        self, pattern_id: str
+        self, tenant_id: str, pattern_id: str,
     ) -> Optional[dict[str, Any]]:
         """Get a cached FP pattern. Returns None on miss or error (fail-open)."""
-        key = f"fp:{pattern_id}"
+        key = f"fp:{tenant_id}:{pattern_id}"
         try:
             raw = await self._client.get(key)  # type: ignore[union-attr]
             if raw is None:
@@ -141,15 +143,15 @@ class RedisClient:
             logger.warning("Redis get_fp_pattern failed for %s", key, exc_info=True)
             return None
 
-    async def list_fp_patterns(self) -> list[str]:
-        """List all FP pattern keys using SCAN."""
+    async def list_fp_patterns(self, tenant_id: str) -> list[str]:
+        """List FP pattern keys for a tenant using SCAN."""
         try:
             keys: list[str] = []
-            async for key in self._client.scan_iter(match="fp:*"):  # type: ignore[union-attr]
+            async for key in self._client.scan_iter(match=f"fp:{tenant_id}:*"):  # type: ignore[union-attr]
                 keys.append(key)
             return keys
         except Exception:
-            logger.warning("Redis list_fp_patterns failed", exc_info=True)
+            logger.warning("Redis list_fp_patterns failed for tenant %s", tenant_id, exc_info=True)
             return []
 
     # --- Health & Lifecycle ---

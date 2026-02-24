@@ -1,8 +1,15 @@
-"""Tests for PII redaction — Story 5.2."""
+"""Tests for PII redaction — Story 5.2, Sprint 2 fixes."""
 
 from __future__ import annotations
 
-from context_gateway.pii_redactor import RedactionMap, deanonymise_text, redact_pii
+from context_gateway.pii_redactor import (
+    RedactionMap,
+    deanonymise_text,
+    encrypt_redaction_map,
+    decrypt_redaction_map,
+    redact_pii,
+)
+from cryptography.fernet import Fernet
 
 
 class TestRedactionMap:
@@ -94,3 +101,81 @@ class TestDeanonymise:
         restored = deanonymise_text(redacted, rm)
         assert "10.0.0.1" in restored
         assert "10.0.0.2" in restored
+
+
+# ---------- F3: Hostname regex false positives --------------------------------
+
+class TestHostnameExclusions:
+    def test_infra_hostnames_preserved(self):
+        """Common infra hostnames like WEB-SERVER should NOT be redacted."""
+        text = "Alert from WEB-SERVER and DB-ROUTER and APP-SWITCH"
+        redacted, rm = redact_pii(text)
+        assert "WEB-SERVER" in redacted
+        assert "DB-ROUTER" in redacted
+        assert "APP-SWITCH" in redacted
+
+    def test_real_user_hostnames_still_redacted(self):
+        """User hostnames like JSMITH-LAPTOP should still be redacted."""
+        text = "JSMITH-WORKSTATION connected to the VPN"
+        redacted, rm = redact_pii(text)
+        assert "JSMITH-WORKSTATION" not in redacted
+        assert "HOST_001" in redacted
+
+
+# ---------- F4: Chat handle regex hits ECS field names ------------------------
+
+class TestChatHandleEcsExclusions:
+    def test_ecs_fields_preserved(self):
+        """ECS fields like @timestamp should NOT be redacted."""
+        text = "Log entry: @timestamp=2024-01-01 @version=1 @metadata"
+        redacted, rm = redact_pii(text)
+        assert "@timestamp" in redacted
+        assert "@version" in redacted
+        assert "@metadata" in redacted
+
+    def test_real_chat_handles_still_redacted(self):
+        """Real chat handles like @jsmith should still be redacted."""
+        text = "Message from @jsmith.ops in the channel"
+        redacted, rm = redact_pii(text)
+        assert "@jsmith.ops" not in redacted
+        assert "USER_001" in redacted
+
+
+# ---------- F9: File path regex only matches C:\Users\ -----------------------
+
+class TestFilePathDriveLetter:
+    def test_non_c_drive_redacted(self):
+        """File paths on D:\\ or E:\\ should also be redacted."""
+        text = r"Found file at D:\Users\jsmith\docs\secrets.txt"
+        redacted, rm = redact_pii(text)
+        assert "jsmith" not in redacted
+
+
+# ---------- F10: Encrypted redaction map loses counters -----------------------
+
+class TestEncryptedRedactionMapCounters:
+    def test_round_trip_preserves_counters(self):
+        """encrypt → decrypt round-trip should preserve counter state."""
+        key = Fernet.generate_key()
+        rm = RedactionMap()
+        rm.get_or_create("10.0.0.1", "IP_SRC")
+        rm.get_or_create("10.0.0.2", "IP_SRC")
+        assert rm._counters["IP_SRC"] == 2
+
+        encrypted = encrypt_redaction_map(rm, key)
+        restored = decrypt_redaction_map(encrypted, key)
+        assert restored._counters["IP_SRC"] == 2
+
+    def test_continued_redaction_after_decrypt_uses_correct_counter(self):
+        """After decrypt, new redactions should continue from the right counter."""
+        key = Fernet.generate_key()
+        rm = RedactionMap()
+        rm.get_or_create("10.0.0.1", "IP_SRC")
+        rm.get_or_create("10.0.0.2", "IP_SRC")
+
+        encrypted = encrypt_redaction_map(rm, key)
+        restored = decrypt_redaction_map(encrypted, key)
+
+        # Next IP should be IP_SRC_003, not IP_SRC_001
+        p = restored.get_or_create("10.0.0.3", "IP_SRC")
+        assert p == "IP_SRC_003"
