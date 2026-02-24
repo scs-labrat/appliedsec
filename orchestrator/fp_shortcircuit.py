@@ -30,35 +30,90 @@ class FPMatchResult:
 class FPShortCircuit:
     """Matches alerts against known FP patterns for zero-LLM-cost closure."""
 
-    def __init__(self, redis_client: Any) -> None:
+    def __init__(
+        self,
+        redis_client: Any,
+        kill_switch_manager: Any | None = None,
+        threshold_adjuster: Any | None = None,
+    ) -> None:
         self._redis = redis_client
+        self._kill_switch = kill_switch_manager
+        self._threshold_adjuster = threshold_adjuster
 
     async def check(
         self,
         state: GraphState,
         alert_title: str,
+        tenant_id: str = "",
+        technique_id: str = "",
+        data_source: str = "",
+        alert_rule_family: str = "",
+        alert_asset_class: str = "",
     ) -> FPMatchResult:
         """Check alert against all FP patterns.
 
         Returns FPMatchResult indicating whether to short-circuit.
+        Kill switches block matching before any pattern evaluation.
+        Shadow patterns are excluded from active matching.
         """
-        pattern_keys = await self._redis.list_fp_patterns()
+        # Kill switch check — if any dimension is killed, skip matching
+        if self._kill_switch is not None and tenant_id:
+            killed = await self._kill_switch.is_killed(
+                tenant_id=tenant_id,
+                technique_id=technique_id,
+                data_source=data_source,
+            )
+            if killed:
+                return FPMatchResult(matched=False)
+
+        # F5: pass tenant_id for tenant-scoped FP pattern keys
+        effective_tenant = tenant_id or state.tenant_id
+        pattern_keys = await self._redis.list_fp_patterns(effective_tenant)
         state.queries_executed += 1
 
         for key in pattern_keys:
-            pattern_id = key.replace("fp:", "") if key.startswith("fp:") else key
-            pattern = await self._redis.get_fp_pattern(pattern_id)
+            # Keys are now fp:{tenant_id}:{pattern_id} — extract pattern_id
+            parts = key.split(":", 2)
+            pattern_id = parts[2] if len(parts) == 3 else key
+            pattern = await self._redis.get_fp_pattern(effective_tenant, pattern_id)
             state.queries_executed += 1
             if pattern is None:
                 continue
 
-            if pattern.get("status") != "approved":
+            status = pattern.get("status", "")
+
+            # Skip shadow patterns — they run in canary only
+            if status == "shadow":
+                continue
+
+            # Only match approved or active patterns
+            if status not in ("approved", "active"):
+                continue
+
+            # Per-pattern kill switch check
+            if self._kill_switch is not None:
+                pattern_killed = await self._kill_switch.is_killed(
+                    tenant_id=tenant_id or "",
+                    pattern_id=pattern_id,
+                )
+                if pattern_killed:
+                    continue
+
+            # Blast-radius scope check
+            from orchestrator.fp_governance import matches_scope
+            if not matches_scope(
+                pattern,
+                alert_rule_family=alert_rule_family,
+                alert_tenant_id=tenant_id,
+                alert_asset_class=alert_asset_class,
+            ):
                 continue
 
             confidence = self._compute_match_confidence(
                 pattern, alert_title, state.entities
             )
-            if confidence >= FP_CONFIDENCE_THRESHOLD:
+            effective_threshold = self._get_effective_threshold()
+            if confidence >= effective_threshold:
                 return FPMatchResult(
                     matched=True,
                     pattern_id=pattern_id,
@@ -66,6 +121,16 @@ class FPShortCircuit:
                 )
 
         return FPMatchResult(matched=False)
+
+    def _get_effective_threshold(self) -> float:
+        """Return the effective confidence threshold.
+
+        Uses ThresholdAdjuster if available, otherwise falls back to
+        the static FP_CONFIDENCE_THRESHOLD constant.
+        """
+        if self._threshold_adjuster is not None:
+            return self._threshold_adjuster.get_threshold()
+        return FP_CONFIDENCE_THRESHOLD
 
     def apply_shortcircuit(
         self, state: GraphState, match: FPMatchResult

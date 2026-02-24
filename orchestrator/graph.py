@@ -13,11 +13,14 @@ from typing import Any, Optional
 
 from shared.schemas.investigation import (
     AgentRole,
+    DecisionEntry,
     GraphState,
     InvestigationState,
 )
 from orchestrator.persistence import InvestigationRepository
 from orchestrator.fp_shortcircuit import FPShortCircuit
+from orchestrator.agents.response_agent import ApprovalGate
+from shared.schemas.event_taxonomy import EventTaxonomy
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,8 @@ class InvestigationGraph:
         reasoning_agent: Any,
         response_agent: Any,
         fp_shortcircuit: FPShortCircuit | None = None,
+        audit_producer: Any | None = None,
+        shadow_mode_manager: Any | None = None,
     ) -> None:
         self._repo = repository
         self._ioc = ioc_extractor
@@ -57,6 +62,8 @@ class InvestigationGraph:
         self._reasoning = reasoning_agent
         self._response = response_agent
         self._fp = fp_shortcircuit
+        self._audit = audit_producer
+        self._shadow = shadow_mode_manager
 
     async def run(
         self,
@@ -107,6 +114,7 @@ class InvestigationGraph:
             agent=AgentRole.IOC_EXTRACTOR.value,
             action="start_ioc_extraction",
         )
+        self._emit_state_changed(state, "received", "parsing")
         state = await self._ioc.execute(state)
 
         # Stage 1.5: FP Short-Circuit
@@ -114,6 +122,7 @@ class InvestigationGraph:
             fp_result = await self._fp.check(state, alert_title)
             if fp_result.matched:
                 state = self._fp.apply_shortcircuit(state, fp_result)
+                self._emit_auto_closed(state, fp_result.pattern_id, fp_result.confidence)
                 return state
 
         # Stage 2: Parallel Enrichment (PARSING → ENRICHING)
@@ -122,6 +131,7 @@ class InvestigationGraph:
             agent="graph",
             action="start_enrichment",
         )
+        self._emit_state_changed(state, "parsing", "enriching")
 
         enricher_task = self._enricher.execute(state)
         ctem_task = self._ctem.execute(state)
@@ -134,6 +144,7 @@ class InvestigationGraph:
 
         # Merge parallel results
         state = self._merge_parallel_results(state, results)
+        self._emit_enriched(state)
 
         # Stage 3: Reasoning (ENRICHING → REASONING)
         state = await self._repo.transition(
@@ -141,21 +152,48 @@ class InvestigationGraph:
             agent=AgentRole.REASONING_AGENT.value,
             action="start_reasoning",
         )
+        self._emit_state_changed(state, "enriching", "reasoning")
         state = await self._reasoning.execute(state)
+
+        # Trust constraint: if ALL ATLAS detections are untrusted, force human review
+        state = self._apply_trust_constraint(state)
 
         # Stage 4: Branch — RESPONDING or AWAITING_HUMAN
         if state.state == InvestigationState.AWAITING_HUMAN:
+            self._emit_escalated(state)
             await self._repo.save(state)
-            # In production: pause here and wait for approval signal.
-            # For now, the graph returns and callers handle the gate.
             return state
 
-        # Stage 5: Response (RESPONDING → CLOSED)
+        # Stage 5: Shadow mode check — if active, log but don't execute
+        if self._shadow is not None and await self._shadow.is_shadow_active(
+            state.tenant_id
+        ):
+            state.decision_chain.append(DecisionEntry(
+                step="shadow_mode",
+                agent="orchestrator",
+                action="shadow_decision_logged",
+                reasoning="Shadow mode active — decision logged, not executed",
+                confidence=state.confidence,
+            ))
+            await self._shadow.record_shadow_decision(
+                tenant_id=state.tenant_id,
+                rule_family=state.classification or "",
+                shadow_decision=state.classification or "unknown",
+                shadow_confidence=state.confidence,
+                investigation_id=state.investigation_id,
+            )
+            state.state = InvestigationState.AWAITING_HUMAN
+            state.requires_human_approval = True
+            self._emit_escalated(state)
+            return state
+
+        # Stage 6: Response (RESPONDING → CLOSED)
         state = await self._repo.transition(
             state, InvestigationState.RESPONDING,
             agent=AgentRole.RESPONSE_AGENT.value,
             action="start_response",
         )
+        self._emit_state_changed(state, "reasoning", "responding")
         state = await self._response.execute(state)
 
         return state
@@ -189,12 +227,148 @@ class InvestigationGraph:
 
         return state
 
+    # ── Trust constraint ────────────────────────────────────────
+
+    def _apply_trust_constraint(self, state: GraphState) -> GraphState:
+        """Block auto-close/auto-escalation when ALL evidence is untrusted.
+
+        If every ATLAS detection result carries ``telemetry_trust_level ==
+        "untrusted"`` and there is at least one detection, force the
+        investigation to ``AWAITING_HUMAN`` so a human must review.
+        Records the attestation status in the decision chain.
+        """
+        atlas = state.atlas_techniques
+        if not atlas:
+            return state
+
+        # Check if all detections are untrusted
+        all_untrusted = all(
+            (t.get("telemetry_trust_level") if isinstance(t, dict) else getattr(t, "telemetry_trust_level", "trusted"))
+            == "untrusted"
+            for t in atlas
+        )
+
+        if all_untrusted:
+            state.state = InvestigationState.AWAITING_HUMAN
+            state.requires_human_approval = True
+            state.decision_chain.append(DecisionEntry(
+                step="trust_constraint",
+                agent="orchestrator",
+                action="force_human_review",
+                reasoning="All ATLAS detections based on untrusted telemetry",
+                attestation_status="untrusted_only",
+            ))
+            logger.info(
+                "Investigation %s forced to human review: all detections untrusted",
+                state.investigation_id,
+            )
+        else:
+            # Record attestation for mixed/trusted cases
+            attestation_values = set()
+            for t in atlas:
+                if isinstance(t, dict):
+                    val = t.get("attestation_status", "")
+                else:
+                    val = getattr(t, "attestation_status", "")
+                if val:
+                    attestation_values.add(val)
+            if attestation_values:
+                state.decision_chain.append(DecisionEntry(
+                    step="trust_assessment",
+                    agent="orchestrator",
+                    action="trust_verified",
+                    reasoning="Mixed or trusted telemetry sources present",
+                    attestation_status=",".join(sorted(attestation_values)),
+                ))
+
+        return state
+
+    # ── Audit helpers (fire-and-forget) ─────────────────────────
+
+    def _emit_state_changed(self, state: GraphState, from_state: str, to_state: str) -> None:
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=state.tenant_id,
+                event_type="investigation.state_changed",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="orchestrator",
+                investigation_id=state.investigation_id,
+                alert_id=state.alert_id,
+                context={"from_state": from_state, "to_state": to_state},
+            )
+        except (ValueError, KeyError, TypeError):
+            logger.error("Audit emit data error for investigation.state_changed", exc_info=True)
+        except Exception:
+            logger.warning("Audit emit failed for investigation.state_changed", exc_info=True)
+
+    def _emit_auto_closed(self, state: GraphState, pattern_id: str, confidence: float) -> None:
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=state.tenant_id,
+                event_type="alert.auto_closed",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="fp_short_circuit",
+                investigation_id=state.investigation_id,
+                alert_id=state.alert_id,
+                context={"pattern_id": pattern_id, "confidence": confidence},
+            )
+        except (ValueError, KeyError, TypeError):
+            logger.error("Audit emit data error for alert.auto_closed", exc_info=True)
+        except Exception:
+            logger.warning("Audit emit failed for alert.auto_closed", exc_info=True)
+
+    def _emit_enriched(self, state: GraphState) -> None:
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=state.tenant_id,
+                event_type="investigation.enriched",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="orchestrator",
+                investigation_id=state.investigation_id,
+                alert_id=state.alert_id,
+            )
+        except (ValueError, KeyError, TypeError):
+            logger.error("Audit emit data error for investigation.enriched", exc_info=True)
+        except Exception:
+            logger.warning("Audit emit failed for investigation.enriched", exc_info=True)
+
+    def _emit_escalated(self, state: GraphState) -> None:
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=state.tenant_id,
+                event_type="alert.escalated",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="orchestrator",
+                investigation_id=state.investigation_id,
+                alert_id=state.alert_id,
+            )
+        except (ValueError, KeyError, TypeError):
+            logger.error("Audit emit data error for alert.escalated", exc_info=True)
+        except Exception:
+            logger.warning("Audit emit failed for alert.escalated", exc_info=True)
+
     async def resume_from_approval(
         self,
         investigation_id: str,
         approved: bool,
     ) -> GraphState | None:
-        """Resume an investigation after human approval decision."""
+        """Resume an investigation after human approval decision.
+
+        F1: Uses ApprovalGate to determine next transition based on
+        severity-aware timeout behavior (escalate vs close).
+        """
         state = await self._repo.load(investigation_id)
         if state is None:
             logger.error("Investigation %s not found", investigation_id)
@@ -207,19 +381,54 @@ class InvestigationGraph:
             )
             return state
 
-        if approved:
+        # F1: instantiate ApprovalGate with investigation severity
+        gate = ApprovalGate(severity=state.severity)
+        state = gate.resolve(state, approved=approved)
+
+        if state.state == InvestigationState.RESPONDING:
+            # Approved — continue to response execution
             state = await self._repo.transition(
                 state, InvestigationState.RESPONDING,
                 agent="human",
                 action="approval_granted",
             )
             state = await self._response.execute(state)
-        else:
+        elif state.state == InvestigationState.CLOSED:
+            # Medium/low timeout → close
             state = await self._repo.transition(
                 state, InvestigationState.CLOSED,
                 agent="human",
                 action="approval_rejected",
             )
+        else:
+            # Critical/high timeout with escalate behavior — stays AWAITING_HUMAN
+            if gate.timeout_behavior == "escalate" and not approved:
+                self._emit_approval_escalated(state)
+            await self._repo.save(state)
+            return state
 
         await self._repo.save(state)
         return state
+
+    def _emit_approval_escalated(self, state: GraphState) -> None:
+        """Emit approval.escalated event when critical/high timeout escalates."""
+        if self._audit is None:
+            return
+        try:
+            self._audit.emit(
+                tenant_id=state.tenant_id,
+                event_type=EventTaxonomy.APPROVAL_ESCALATED.value,
+                event_category="approval",
+                actor_type="system",
+                actor_id="orchestrator",
+                investigation_id=state.investigation_id,
+                alert_id=state.alert_id,
+                context={
+                    "severity": state.severity,
+                    "classification": state.classification,
+                },
+            )
+        except (ValueError, KeyError, TypeError):
+            logger.error("Audit emit data error for approval.escalated", exc_info=True)
+        except Exception:
+            logger.warning("Audit emit failed for approval.escalated", exc_info=True)

@@ -66,18 +66,18 @@ class TestSetIoc:
     async def test_high_confidence_ttl(self, client: RedisClient):
         mock = _mock_redis()
         client._client = mock
-        await client.set_ioc("ip", "1.2.3.4", {"family": "emotet"}, confidence=85)
+        await client.set_ioc("tenant-A", "ip", "1.2.3.4", {"family": "emotet"}, confidence=85)
         mock.set.assert_called_once_with(
-            "ioc:ip:1.2.3.4", json.dumps({"family": "emotet"}), ex=2_592_000
+            "ioc:tenant-A:ip:1.2.3.4", json.dumps({"family": "emotet"}), ex=2_592_000
         )
 
     @pytest.mark.asyncio
     async def test_medium_confidence_ttl(self, client: RedisClient):
         mock = _mock_redis()
         client._client = mock
-        await client.set_ioc("domain", "evil.com", {"status": "active"}, confidence=65)
+        await client.set_ioc("tenant-A", "domain", "evil.com", {"status": "active"}, confidence=65)
         mock.set.assert_called_once_with(
-            "ioc:domain:evil.com",
+            "ioc:tenant-A:domain:evil.com",
             json.dumps({"status": "active"}),
             ex=604_800,
         )
@@ -86,9 +86,9 @@ class TestSetIoc:
     async def test_low_confidence_ttl(self, client: RedisClient):
         mock = _mock_redis()
         client._client = mock
-        await client.set_ioc("hash", "abc123", {"type": "md5"}, confidence=30)
+        await client.set_ioc("tenant-A", "hash", "abc123", {"type": "md5"}, confidence=30)
         mock.set.assert_called_once_with(
-            "ioc:hash:abc123", json.dumps({"type": "md5"}), ex=86_400
+            "ioc:tenant-A:hash:abc123", json.dumps({"type": "md5"}), ex=86_400
         )
 
 
@@ -100,7 +100,7 @@ class TestGetIoc:
         mock = _mock_redis()
         mock.get = AsyncMock(return_value=json.dumps({"family": "emotet"}))
         client._client = mock
-        result = await client.get_ioc("hash", "abc123")
+        result = await client.get_ioc("tenant-A", "hash", "abc123")
         assert result == {"family": "emotet"}
 
     @pytest.mark.asyncio
@@ -108,7 +108,7 @@ class TestGetIoc:
         mock = _mock_redis()
         mock.get = AsyncMock(return_value=None)
         client._client = mock
-        result = await client.get_ioc("ip", "8.8.8.8")
+        result = await client.get_ioc("tenant-A", "ip", "8.8.8.8")
         assert result is None
 
 
@@ -120,7 +120,7 @@ class TestFailOpen:
         mock = _mock_redis()
         mock.get = AsyncMock(side_effect=redis.exceptions.ConnectionError("down"))
         client._client = mock
-        result = await client.get_ioc("ip", "1.2.3.4")
+        result = await client.get_ioc("tenant-A", "ip", "1.2.3.4")
         assert result is None
 
     @pytest.mark.asyncio
@@ -128,7 +128,7 @@ class TestFailOpen:
         mock = _mock_redis()
         mock.get = AsyncMock(side_effect=redis.exceptions.TimeoutError("timeout"))
         client._client = mock
-        result = await client.get_fp_pattern("fp-001")
+        result = await client.get_fp_pattern("tenant-A", "fp-001")
         assert result is None
 
     @pytest.mark.asyncio
@@ -137,7 +137,7 @@ class TestFailOpen:
         mock.set = AsyncMock(side_effect=redis.exceptions.ConnectionError("down"))
         client._client = mock
         # Should not raise
-        await client.set_ioc("ip", "1.2.3.4", {"x": 1}, confidence=90)
+        await client.set_ioc("tenant-A", "ip", "1.2.3.4", {"x": 1}, confidence=90)
 
     @pytest.mark.asyncio
     async def test_health_check_fail_open(self, client: RedisClient):
@@ -148,7 +148,7 @@ class TestFailOpen:
 
 
 class TestFpPattern:
-    """AC-1.3.8, AC-1.3.9: FP pattern cache."""
+    """AC-1.3.8, AC-1.3.9: FP pattern cache with tenant isolation (F5)."""
 
     @pytest.mark.asyncio
     async def test_set_and_get_fp_pattern(self, client: RedisClient):
@@ -157,12 +157,12 @@ class TestFpPattern:
         mock.get = AsyncMock(return_value=json.dumps(pattern))
         client._client = mock
 
-        await client.set_fp_pattern("fp-001", pattern)
+        await client.set_fp_pattern("tenant-A", "fp-001", pattern)
         mock.set.assert_called_once_with(
-            "fp:fp-001", json.dumps(pattern), ex=86_400
+            "fp:tenant-A:fp-001", json.dumps(pattern), ex=86_400
         )
 
-        result = await client.get_fp_pattern("fp-001")
+        result = await client.get_fp_pattern("tenant-A", "fp-001")
         assert result == pattern
 
     @pytest.mark.asyncio
@@ -170,8 +170,34 @@ class TestFpPattern:
         mock = _mock_redis()
         mock.get = AsyncMock(return_value=None)
         client._client = mock
-        result = await client.get_fp_pattern("fp-missing")
+        result = await client.get_fp_pattern("tenant-A", "fp-missing")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_fp_key_includes_tenant_id(self, client: RedisClient):
+        """F5: FP pattern keys must include tenant_id for isolation."""
+        mock = _mock_redis()
+        client._client = mock
+        await client.set_fp_pattern("tenant-X", "fp-100", {"test": True})
+        call_args = mock.set.call_args
+        key = call_args[0][0]
+        assert key == "fp:tenant-X:fp-100"
+        assert "tenant-X" in key
+
+    @pytest.mark.asyncio
+    async def test_cross_tenant_isolation(self, client: RedisClient):
+        """F5: Tenant A's patterns should not be visible to tenant B."""
+        mock = _mock_redis()
+        client._client = mock
+
+        # Store pattern for tenant-A
+        await client.set_fp_pattern("tenant-A", "fp-001", {"data": "a"})
+        # Get for tenant-B should use different key
+        mock.get = AsyncMock(return_value=None)
+        result = await client.get_fp_pattern("tenant-B", "fp-001")
+        assert result is None
+        # Verify it queried the tenant-B scoped key
+        mock.get.assert_called_with("fp:tenant-B:fp-001")
 
 
 class TestHealthCheck:

@@ -1,6 +1,9 @@
-"""Context Enricher agent — Story 7.3.
+"""Context Enricher agent — Stories 7.3, 15.1.
 
 Parallel lookups: Redis IOC, Postgres UEBA, Qdrant similar incidents.
+
+Story 15.1 adds hierarchical retrieval with tier-based context budgets
+and structured case facts for cross-step token reuse.
 """
 
 from __future__ import annotations
@@ -8,12 +11,87 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from shared.schemas.investigation import GraphState, InvestigationState
 from shared.schemas.scoring import score_incident
 
 logger = logging.getLogger(__name__)
+
+# ---- Structured case facts (Story 15.1, Task 2) ----------------------------
+
+# Approximate tokens-per-char ratio (4 chars ≈ 1 token)
+_CHARS_PER_TOKEN = 4
+
+
+@dataclass
+class CaseFacts:
+    """Compact structured representation of first-pass retrieval results.
+
+    Stored in ``GraphState.case_facts`` so subsequent investigation steps
+    do not re-pay the token cost of re-retrieving the same data.
+    """
+
+    entities: list[str] = field(default_factory=list)
+    iocs: list[dict[str, Any]] = field(default_factory=list)
+    techniques: list[str] = field(default_factory=list)
+    timeline: list[dict[str, Any]] = field(default_factory=list)
+    similar_incidents: list[dict[str, Any]] = field(default_factory=list)
+    token_estimate: int = 0
+
+
+def extract_case_facts(state: GraphState) -> CaseFacts:
+    """Extract structured case facts from the current investigation state.
+
+    Pulls entities, IOCs, techniques, timeline, and similar incidents
+    from the first-pass retrieval results and computes a token estimate.
+    """
+    # Flatten entity values
+    entity_values: list[str] = []
+    for etype in ("accounts", "hosts", "ips"):
+        for entity in state.entities.get(etype, []):
+            val = entity.get("primary_value", "") if isinstance(entity, dict) else str(entity)
+            if val:
+                entity_values.append(val)
+
+    # IOC summaries (compact: type+value only)
+    iocs = [
+        {"type": ioc.get("type", ""), "value": ioc.get("value", "")}
+        for ioc in state.ioc_matches
+        if isinstance(ioc, dict) and ioc.get("value")
+    ]
+
+    # Techniques from entities (if present)
+    techniques: list[str] = list(state.entities.get("techniques", []))
+
+    # Timeline from UEBA anomalies
+    timeline: list[dict[str, Any]] = []
+    for ueba in state.ueba_context:
+        if isinstance(ueba, dict):
+            for anomaly in ueba.get("anomalies", []):
+                if isinstance(anomaly, dict):
+                    timeline.append(anomaly)
+
+    # Similar incident summaries (compact)
+    similar = [
+        {"incident_id": s.get("incident_id", ""), "title": s.get("title", "")}
+        for s in state.similar_incidents
+        if isinstance(s, dict)
+    ]
+
+    facts = CaseFacts(
+        entities=entity_values,
+        iocs=iocs,
+        techniques=techniques,
+        timeline=timeline,
+        similar_incidents=similar,
+    )
+
+    # Estimate token cost of these facts
+    text_repr = str(facts)
+    facts.token_estimate = len(text_repr) // _CHARS_PER_TOKEN
+    return facts
 
 
 class ContextEnricherAgent:
@@ -29,14 +107,24 @@ class ContextEnricherAgent:
         self._postgres = postgres_client
         self._qdrant = qdrant_client
 
-    async def execute(self, state: GraphState) -> GraphState:
-        """Execute parallel enrichment.
+    async def execute(
+        self, state: GraphState, *, tier: str = "tier_0",
+    ) -> GraphState:
+        """Execute parallel enrichment with optional hierarchical retrieval.
 
         State transition: PARSING → ENRICHING.
+
+        Story 15.1: For Tier 1+ tasks, a second-pass deep retrieval is
+        performed after structuring first-pass results into case facts.
+        Tier 0 uses a single broad pass only.
+
+        Args:
+            state: Current investigation graph state.
+            tier: LLM routing tier (default ``"tier_0"`` for backward compat).
         """
         state.state = InvestigationState.ENRICHING
 
-        # Parallel enrichment
+        # ---- First pass: broad, parallel enrichment ----
         ioc_task = self._enrich_iocs(state)
         ueba_task = self._query_ueba(state)
         similar_task = self._search_similar_incidents(state)
@@ -64,7 +152,82 @@ class ContextEnricherAgent:
         elif isinstance(similar_results, Exception):
             logger.warning("Similar incident search failed: %s", similar_results)
 
+        # ---- Structure case facts from first-pass results ----
+        facts = extract_case_facts(state)
+        state.case_facts = {
+            "entities": facts.entities,
+            "iocs": facts.iocs,
+            "techniques": facts.techniques,
+            "timeline": facts.timeline,
+            "similar_incidents": facts.similar_incidents,
+            "token_estimate": facts.token_estimate,
+        }
+
+        # ---- Second pass: deep retrieval for Tier 1+ only ----
+        if tier in ("tier_1", "tier_1_plus", "tier_2"):
+            await self._deep_retrieval(state, facts)
+
         return state
+
+    async def _deep_retrieval(
+        self, state: GraphState, facts: CaseFacts,
+    ) -> None:
+        """Second-pass deep retrieval using structured case facts.
+
+        Fetches detailed threat intel for identified techniques and
+        additional UEBA context for high-risk entities.
+        """
+        tasks: list[Any] = []
+
+        # Deep technique intel: query each identified technique
+        for technique in facts.techniques:
+            tasks.append(self._fetch_technique_intel(technique))
+
+        # Deep entity context for entities with IOC matches
+        matched_entities = {ioc.get("value", "") for ioc in facts.iocs if ioc.get("value")}
+        for entity in facts.entities:
+            if entity in matched_entities:
+                tasks.append(self._fetch_deep_entity_context(entity))
+
+        if not tasks:
+            return
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        deep_context: list[dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, dict):
+                deep_context.append(result)
+            elif isinstance(result, Exception):
+                logger.warning("Deep retrieval task failed: %s", result)
+
+        # Store deep context in case_facts
+        state.case_facts["deep_context"] = deep_context
+
+    async def _fetch_technique_intel(self, technique: str) -> dict[str, Any]:
+        """Fetch detailed threat intelligence for a specific technique."""
+        try:
+            row = await self._postgres.fetch_one(
+                "SELECT technique_id, name, description, severity, data_sources, mitigations FROM threat_intel WHERE technique_id = $1",
+                technique,
+            )
+            if row:
+                return {"type": "technique_intel", "technique": technique, **row}
+        except Exception:
+            logger.warning("Technique intel fetch failed for %s", technique, exc_info=True)
+        return {"type": "technique_intel", "technique": technique, "detail": "unavailable"}
+
+    async def _fetch_deep_entity_context(self, entity_value: str) -> dict[str, Any]:
+        """Fetch additional UEBA context for a high-risk entity."""
+        try:
+            row = await self._postgres.fetch_one(
+                "SELECT entity_id, entity_type, first_seen, last_seen, context, risk_score FROM user_entity_behavior_detail WHERE entity_value = $1",
+                entity_value,
+            )
+            if row:
+                return {"type": "entity_deep_context", "entity": entity_value, **row}
+        except Exception:
+            logger.warning("Deep entity context failed for %s", entity_value, exc_info=True)
+        return {"type": "entity_deep_context", "entity": entity_value, "detail": "unavailable"}
 
     async def _enrich_iocs(self, state: GraphState) -> list[dict[str, Any]]:
         """Re-enrich IOCs from Redis (supplements IOC Extractor)."""
@@ -75,7 +238,7 @@ class ContextEnricherAgent:
             if not ioc_type or not ioc_value:
                 enriched.append(ioc)
                 continue
-            cached = await self._redis.get_ioc(ioc_type, ioc_value)
+            cached = await self._redis.get_ioc(state.tenant_id, ioc_type, ioc_value)
             state.queries_executed += 1
             if cached:
                 enriched.append({**ioc, **cached})
@@ -124,7 +287,9 @@ class ContextEnricherAgent:
             return []
 
         try:
-            raw_results = self._qdrant.search(
+            # F11: wrap synchronous Qdrant client in asyncio.to_thread
+            raw_results = await asyncio.to_thread(
+                self._qdrant.search,
                 collection="incident_embeddings",
                 query_vector=state.entities.get("embedding", [0.0] * 1536),
                 limit=5,
@@ -146,11 +311,14 @@ class ContextEnricherAgent:
                 else 0.0
             )
 
+            # F2: pass is_rare_important from Qdrant payload metadata
+            is_rare_important = payload.get("is_rare_important", False)
             incident_score = score_incident(
                 vector_similarity=hit.get("score", 0.0),
                 age_days=payload.get("age_days", 30),
                 same_tenant=payload.get("tenant_id") == state.tenant_id,
                 technique_overlap=overlap,
+                is_rare_important=is_rare_important,
             )
 
             scored.append({
