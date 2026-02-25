@@ -1,0 +1,128 @@
+<!-- Inline investigation detail partial for approval queue cards -->
+<div class="mt-4 pt-4 border-t border-gray-700 space-y-4">
+
+    <!-- Alert & Classification Info -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div>
+            <p class="text-gray-500 text-xs">Alert ID</p>
+            <p class="font-mono text-gray-200">{{ inv.alert_id or '-' }}</p>
+        </div>
+        <div>
+            <p class="text-gray-500 text-xs">Tenant</p>
+            <p class="text-gray-200">{{ inv.tenant_id or '-' }}</p>
+        </div>
+        <div>
+            <p class="text-gray-500 text-xs">Classification</p>
+            <p class="text-gray-200">{{ inv.classification or '-' }}</p>
+        </div>
+        <div>
+            <p class="text-gray-500 text-xs">Confidence</p>
+            <p class="text-gray-200">{{ "%.0f"|format(inv.confidence * 100) }}%</p>
+        </div>
+    </div>
+
+    <!-- Scoring -->
+    <div class="grid grid-cols-3 gap-3 text-sm">
+        <div>
+            <p class="text-gray-500 text-xs">Risk State</p>
+            <p class="text-gray-200">{{ inv.risk_state }}</p>
+        </div>
+        <div>
+            <p class="text-gray-500 text-xs">LLM Calls</p>
+            <p class="text-gray-200">{{ inv.llm_calls }}</p>
+        </div>
+        <div>
+            <p class="text-gray-500 text-xs">Cost</p>
+            <p class="text-gray-200">${{ "%.4f"|format(inv.total_cost_usd) }}</p>
+        </div>
+    </div>
+
+    <!-- Entities -->
+    {% if inv.entities %}
+    <details class="bg-gray-900 rounded p-3">
+        <summary class="text-sm font-medium text-gray-300 cursor-pointer hover:text-blue-400">Entities</summary>
+        <pre class="text-xs text-gray-400 mt-2 overflow-x-auto">{{ inv.entities | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- IOC Matches -->
+    {% if inv.ioc_matches %}
+    <details class="bg-gray-900 rounded p-3">
+        <summary class="text-sm font-medium text-gray-300 cursor-pointer hover:text-blue-400">IOC Matches ({{ inv.ioc_matches|length }})</summary>
+        <pre class="text-xs text-gray-400 mt-2 overflow-x-auto">{{ inv.ioc_matches | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- CTEM Exposures -->
+    {% if inv.ctem_exposures %}
+    <details class="bg-gray-900 rounded p-3">
+        <summary class="text-sm font-medium text-gray-300 cursor-pointer hover:text-blue-400">CTEM Exposures ({{ inv.ctem_exposures|length }})</summary>
+        <pre class="text-xs text-gray-400 mt-2 overflow-x-auto">{{ inv.ctem_exposures | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- ATLAS Techniques -->
+    {% if inv.atlas_techniques %}
+    <details class="bg-gray-900 rounded p-3">
+        <summary class="text-sm font-medium text-gray-300 cursor-pointer hover:text-blue-400">ATLAS Techniques ({{ inv.atlas_techniques|length }})</summary>
+        <pre class="text-xs text-gray-400 mt-2 overflow-x-auto">{{ inv.atlas_techniques | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- Recommended Actions -->
+    {% if inv.recommended_actions %}
+    <details class="bg-gray-900 rounded p-3" open>
+        <summary class="text-sm font-medium text-gray-300 cursor-pointer hover:text-blue-400">Recommended Actions ({{ inv.recommended_actions|length }})</summary>
+        <pre class="text-xs text-gray-400 mt-2 overflow-x-auto">{{ inv.recommended_actions | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+
+    <!-- Decision Chain Timeline -->
+    {% if inv.decision_chain %}
+    <div class="bg-gray-900 rounded p-3">
+        <p class="text-sm font-medium text-gray-300 mb-2">Decision Chain</p>
+        <div class="space-y-3">
+            {% for entry in inv.decision_chain %}
+            {% set agent = entry.agent if entry is mapping else entry.get('agent', '') %}
+            {% set action = entry.action if entry is mapping else entry.get('action', '') %}
+            {% set confidence = entry.confidence if entry is mapping else entry.get('confidence', none) %}
+            {% set timestamp = entry.timestamp if entry is mapping else entry.get('timestamp', '') %}
+            <div class="flex items-start space-x-2">
+                <div class="w-2 h-2 rounded-full mt-1.5
+                    {% if agent == 'ioc_extractor' %}bg-purple-500
+                    {% elif agent == 'context_enricher' %}bg-blue-500
+                    {% elif agent == 'reasoning_agent' %}bg-orange-500
+                    {% elif agent == 'response_agent' %}bg-green-500
+                    {% elif agent == 'ctem_correlator' %}bg-cyan-500
+                    {% elif agent == 'atlas_mapper' %}bg-pink-500
+                    {% else %}bg-gray-500{% endif %}"></div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="font-medium px-1.5 py-0.5 rounded
+                            {% if agent == 'ioc_extractor' %}bg-purple-900/60 text-purple-300
+                            {% elif agent == 'context_enricher' %}bg-blue-900/60 text-blue-300
+                            {% elif agent == 'reasoning_agent' %}bg-orange-900/60 text-orange-300
+                            {% elif agent == 'response_agent' %}bg-green-900/60 text-green-300
+                            {% elif agent == 'ctem_correlator' %}bg-cyan-900/60 text-cyan-300
+                            {% elif agent == 'atlas_mapper' %}bg-pink-900/60 text-pink-300
+                            {% else %}bg-gray-700 text-gray-300{% endif %}">{{ agent }}</span>
+                        {% if confidence is not none %}
+                        <span class="text-gray-500">{{ "%.0f"|format(confidence * 100) }}%</span>
+                        {% endif %}
+                        <span class="text-gray-600">{{ timestamp }}</span>
+                    </div>
+                    <p class="text-xs text-gray-300 mt-0.5">{{ action }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Link to full page -->
+    <div class="text-right">
+        <a href="/investigations/{{ inv.investigation_id }}" class="text-xs text-blue-400 hover:text-blue-300">
+            Open full investigation page &rarr;
+        </a>
+    </div>
+</div>

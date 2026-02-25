@@ -9,53 +9,67 @@
 
     <div id="approval-cards" class="space-y-4">
         {% for inv in investigations %}
-        <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 hover:border-gray-600">
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-3 mb-2">
-                        <!-- Severity badge -->
-                        {% if inv.severity == 'critical' %}
-                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-900 text-red-300">CRITICAL</span>
-                        {% elif inv.severity == 'high' %}
-                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-orange-900 text-orange-300">HIGH</span>
-                        {% elif inv.severity == 'medium' %}
-                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-yellow-900 text-yellow-300">MEDIUM</span>
-                        {% else %}
-                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-gray-700 text-gray-300">{{ (inv.severity or 'unknown')|upper }}</span>
-                        {% endif %}
+        <div class="bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors">
+            <!-- Card header — clickable to expand -->
+            <div class="p-5">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 cursor-pointer"
+                         hx-get="/api/approvals/{{ inv.investigation_id }}/detail"
+                         hx-target="#detail-{{ inv.investigation_id }}"
+                         hx-swap="innerHTML"
+                         hx-trigger="click"
+                         hx-indicator="#spinner-{{ inv.investigation_id }}">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <!-- Severity badge -->
+                            {% if inv.severity == 'critical' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-900 text-red-300">CRITICAL</span>
+                            {% elif inv.severity == 'high' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-orange-900 text-orange-300">HIGH</span>
+                            {% elif inv.severity == 'medium' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-yellow-900 text-yellow-300">MEDIUM</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-gray-700 text-gray-300">{{ (inv.severity or 'unknown')|upper }}</span>
+                            {% endif %}
 
-                        <a href="/investigations/{{ inv.investigation_id }}"
-                           class="text-blue-400 hover:text-blue-300 font-medium">
-                            {{ inv.investigation_id[:16] }}...
-                        </a>
+                            <span class="text-blue-400 font-medium">
+                                {{ inv.investigation_id[:16] }}...
+                            </span>
+
+                            <span class="htmx-indicator text-gray-500 text-xs" id="spinner-{{ inv.investigation_id }}">Loading...</span>
+                        </div>
+
+                        <div class="text-sm text-gray-400 space-y-1">
+                            <p>Alert: <span class="text-gray-300">{{ inv.alert_id or '-' }}</span></p>
+                            <p>Classification: <span class="text-gray-300">{{ inv.classification or '-' }}</span></p>
+                            <p>Tenant: <span class="text-gray-300">{{ inv.tenant_id or '-' }}</span></p>
+                            <p class="text-xs text-gray-500">Updated: {{ inv.updated_at }}</p>
+                        </div>
+
+                        <p class="text-xs text-blue-400/70 mt-2">Click to expand investigation details</p>
                     </div>
 
-                    <div class="text-sm text-gray-400 space-y-1">
-                        <p>Alert: <span class="text-gray-300">{{ inv.alert_id or '-' }}</span></p>
-                        <p>Classification: <span class="text-gray-300">{{ inv.classification or '-' }}</span></p>
-                        <p>Tenant: <span class="text-gray-300">{{ inv.tenant_id or '-' }}</span></p>
-                        <p class="text-xs text-gray-500">Updated: {{ inv.updated_at }}</p>
+                    <!-- Action buttons -->
+                    <div class="flex flex-col space-y-2 ml-4">
+                        <button hx-post="/api/investigations/{{ inv.investigation_id }}/approve"
+                                hx-confirm="Approve this investigation?"
+                                hx-target="closest div.bg-gray-800"
+                                hx-swap="outerHTML"
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
+                            Approve
+                        </button>
+                        <button hx-post="/api/investigations/{{ inv.investigation_id }}/reject"
+                                hx-confirm="Reject this investigation?"
+                                hx-target="closest div.bg-gray-800"
+                                hx-swap="outerHTML"
+                                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium">
+                            Reject
+                        </button>
                     </div>
-                </div>
-
-                <!-- Action buttons -->
-                <div class="flex flex-col space-y-2 ml-4">
-                    <button hx-post="/api/investigations/{{ inv.investigation_id }}/approve"
-                            hx-confirm="Approve this investigation?"
-                            hx-target="closest div.bg-gray-800"
-                            hx-swap="outerHTML"
-                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
-                        Approve
-                    </button>
-                    <button hx-post="/api/investigations/{{ inv.investigation_id }}/reject"
-                            hx-confirm="Reject this investigation?"
-                            hx-target="closest div.bg-gray-800"
-                            hx-swap="outerHTML"
-                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium">
-                        Reject
-                    </button>
                 </div>
             </div>
+
+            <!-- Expandable detail area -->
+            <div id="detail-{{ inv.investigation_id }}" class="px-5 pb-5"></div>
         </div>
         {% else %}
         <div class="text-center py-12 text-gray-500">

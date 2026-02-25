@@ -66,6 +66,20 @@ async def approvals_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/api/approvals/{investigation_id}/detail", response_class=HTMLResponse)
+async def approval_detail_partial(request: Request, investigation_id: str) -> HTMLResponse:
+    """Return an HTML fragment with full investigation details for inline expansion."""
+    repo = get_repo()
+    state = await repo.load(investigation_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    return templates.TemplateResponse(
+        "approvals/detail_partial.html",
+        {"request": request, "inv": state},
+    )
+
+
 @router.post("/api/investigations/{investigation_id}/approve")
 async def approve_investigation(investigation_id: str) -> dict[str, str]:
     """Approve an investigation — transition to RESPONDING."""
