@@ -1,0 +1,11 @@
+.git
+.pytest_cache
+__pycache__
+*.pyc
+*.egg-info
+chroma_db/
+omeriko-agent/
+tests/
+docs/
+.claude/
+*.md

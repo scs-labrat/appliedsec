@@ -89,9 +89,10 @@ services:
     volumes:
       - miniodata:/data
 
-  # --- ALUSKORT Services ---
+  # --- ALUSKORT Services (shared Dockerfile, per-service command) ---
   entity-parser:
-    build: ./services/entity_parser
+    build: .
+    command: ["python", "-m", "entity_parser.service"]
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       POSTGRES_DSN: postgresql://aluskort:localdev@postgres:5432/aluskort
@@ -100,13 +101,18 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
     profiles: ["services"]
 
   context-gateway:
-    build: ./services/context_gateway
+    build: .
+    command: ["uvicorn", "context_gateway.api:app", "--host", "0.0.0.0", "--port", "8030"]
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       POSTGRES_DSN: postgresql://aluskort:localdev@postgres:5432/aluskort
+      PORT: "8030"
     ports:
       - "8030:8030"
     depends_on:
@@ -115,9 +121,11 @@ services:
     profiles: ["services"]
 
   llm-router:
-    build: ./services/llm_router
+    build: .
+    command: ["uvicorn", "llm_router.api:app", "--host", "0.0.0.0", "--port", "8031"]
     environment:
       CONTEXT_GATEWAY_URL: http://context-gateway:8030
+      PORT: "8031"
     ports:
       - "8031:8031"
     depends_on:
@@ -125,7 +133,8 @@ services:
     profiles: ["services"]
 
   orchestrator:
-    build: ./services/orchestrator
+    build: .
+    command: ["python", "-m", "orchestrator.service"]
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       POSTGRES_DSN: postgresql://aluskort:localdev@postgres:5432/aluskort
@@ -146,10 +155,14 @@ services:
         condition: service_healthy
       context-gateway:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
     profiles: ["services"]
 
   ctem-normaliser:
-    build: ./services/ctem_normaliser
+    build: .
+    command: ["python", "-m", "ctem_normaliser.service"]
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       POSTGRES_DSN: postgresql://aluskort:localdev@postgres:5432/aluskort
@@ -158,14 +171,18 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
     profiles: ["services"]
 
   dashboard:
-    build: ./services/dashboard
+    build: .
+    command: ["uvicorn", "services.dashboard.app:app", "--host", "0.0.0.0", "--port", "8080"]
     environment:
       POSTGRES_DSN: postgresql://aluskort:localdev@postgres:5432/aluskort
       REDIS_HOST: redis
-      DASHBOARD_PORT: "8080"
+      PORT: "8080"
     ports:
       - "8080:8080"
     depends_on:
