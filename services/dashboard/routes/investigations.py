@@ -92,9 +92,9 @@ async def investigations_page(
         investigations = []
 
     return templates.TemplateResponse(
+        request,
         "investigations/list.html",
         {
-            "request": request,
             "investigations": investigations,
             "filters": {
                 "state": state,

@@ -56,9 +56,9 @@ async def investigation_timeline(request: Request, investigation_id: str) -> HTM
             })
 
     return templates.TemplateResponse(
+        request,
         "components/timeline.html",
         {
-            "request": request,
             "entries": entries,
         },
     )

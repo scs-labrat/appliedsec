@@ -138,8 +138,9 @@ async def overview_page(request: Request) -> HTMLResponse:
     """Render the overview metrics dashboard."""
     metrics = await _fetch_metrics()
     return templates.TemplateResponse(
+        request,
         "overview.html",
-        {"request": request, "metrics": metrics},
+        {"metrics": metrics},
     )
 
 

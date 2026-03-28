@@ -58,9 +58,9 @@ async def approvals_page(request: Request) -> HTMLResponse:
         investigations = []
 
     return templates.TemplateResponse(
+        request,
         "approvals/queue.html",
         {
-            "request": request,
             "investigations": investigations,
         },
     )
@@ -75,8 +75,9 @@ async def approval_detail_partial(request: Request, investigation_id: str) -> HT
         raise HTTPException(status_code=404, detail="Investigation not found")
 
     return templates.TemplateResponse(
+        request,
         "approvals/detail_partial.html",
-        {"request": request, "inv": state},
+        {"inv": state},
     )
 
 

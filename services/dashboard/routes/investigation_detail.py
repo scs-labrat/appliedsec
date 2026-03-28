@@ -25,9 +25,9 @@ async def investigation_detail(request: Request, investigation_id: str) -> HTMLR
         raise HTTPException(status_code=404, detail="Investigation not found")
 
     return templates.TemplateResponse(
+        request,
         "investigations/detail.html",
         {
-            "request": request,
             "inv": state,
         },
     )
