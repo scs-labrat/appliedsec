@@ -1,0 +1,876 @@
+{% extends "base.html" %}
+{% block title %}CISO Dashboard - ALUSKORT{% endblock %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+    /* Expandable chart cards */
+    .chart-card { cursor: pointer; position: relative; }
+    .chart-card::after {
+        content: '';
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 20px;
+        height: 20px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23404245'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4'/%3E%3C/svg%3E");
+        background-size: contain;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    .chart-card:hover::after { opacity: 1; }
+
+    /* Expanded modal overlay */
+    .chart-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: rgba(5, 5, 5, 0.85);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+    .chart-modal-overlay.open {
+        opacity: 1;
+        pointer-events: all;
+    }
+    .chart-modal {
+        width: 95%;
+        max-width: 1400px;
+        max-height: 90vh;
+        background: #18181c;
+        border: 1px solid #23232a;
+        border-radius: 12px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+        transform: scale(0.92);
+        transition: transform 0.25s ease;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .chart-modal-overlay.open .chart-modal {
+        transform: scale(1);
+    }
+    .chart-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        border-bottom: 1px solid #23232a;
+        flex-shrink: 0;
+    }
+    .chart-modal-body {
+        flex: 1;
+        padding: 24px;
+        overflow: auto;
+        min-height: 0;
+    }
+    .chart-modal-canvas-wrap {
+        height: 500px;
+        position: relative;
+    }
+    .chart-modal-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .chart-modal-toolbar button {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        font-size: 0.75rem;
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid #23232a;
+        background: transparent;
+        color: #9ba1a5;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .chart-modal-toolbar button:hover {
+        border-color: #404245;
+        color: #edebe8;
+        background: #1e1e24;
+    }
+    .chart-modal-toolbar button.active {
+        border-color: #e9311a;
+        color: #e9311a;
+        background: rgba(233,49,26,0.08);
+    }
+    .chart-data-panel {
+        margin-top: 16px;
+        padding: 16px;
+        background: #131317;
+        border: 1px solid #23232a;
+        border-radius: 8px;
+        display: none;
+    }
+    .chart-data-panel.show { display: block; }
+    .chart-data-table {
+        width: 100%;
+        font-size: 0.8rem;
+        border-collapse: collapse;
+    }
+    .chart-data-table th {
+        text-align: left;
+        padding: 6px 12px;
+        color: #6b6b6e;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #23232a;
+    }
+    .chart-data-table td {
+        padding: 6px 12px;
+        color: #9ba1a5;
+        font-family: 'Fragment Mono', monospace;
+        border-bottom: 1px solid #1e1e24;
+    }
+    .chart-data-table tr:hover td { background: #1e1e24; }
+    .chart-data-table .highlight td { background: rgba(233,49,26,0.08); color: #edebe8; }
+</style>
+
+<div class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold font-montserrat">Executive Security Dashboard</h1>
+            <p class="text-sm text-ac-gray4 mt-1 font-figtree">30-day operational intelligence — click any chart to expand</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xs text-ac-gray3 font-figtree">Auto-refresh: 60s</span>
+            <span class="text-xs font-mono text-ac-gray4 bg-ac-card border border-ac-border rounded px-3 py-1">{{ "now"|default("2026-03-29") }}</span>
+        </div>
+    </div>
+
+    <!-- ============ KPI CARDS (Row 1) ============ -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">MTTD</p>
+            <p class="text-2xl font-bold mt-1 {% if m.mttd_seconds <= m.mttd_target %}text-ac-green{% else %}text-ac-red{% endif %}">{{ m.mttd_display }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Target: {{ m.mttd_target }}s</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">MTTR</p>
+            <p class="text-2xl font-bold mt-1 {% if m.mttr_minutes <= m.mttr_target %}text-ac-green{% else %}text-ac-red{% endif %}">{{ m.mttr_display }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Target: {{ m.mttr_target }}m</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Automation</p>
+            <p class="text-2xl font-bold mt-1 {% if m.automation_rate >= m.automation_target %}text-ac-green{% else %}text-ac-orange{% endif %}">{{ m.automation_rate }}%</p>
+            <p class="text-xs text-ac-gray4 mt-1">Target: {{ m.automation_target }}%</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">FP Accuracy</p>
+            <p class="text-2xl font-bold mt-1 {% if m.fp_accuracy >= m.fp_target %}text-ac-green{% else %}text-ac-red{% endif %}">{{ m.fp_accuracy }}%</p>
+            <p class="text-xs text-ac-gray4 mt-1">Target: {{ m.fp_target }}%</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">SLA Compliance</p>
+            <p class="text-2xl font-bold mt-1 {% if m.sla_compliance >= m.sla_target %}text-ac-green{% else %}text-ac-red{% endif %}">{{ m.sla_compliance }}%</p>
+            <p class="text-xs text-ac-gray4 mt-1">Target: {{ m.sla_target }}%</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Investigations</p>
+            <p class="text-2xl font-bold text-ac-blue mt-1">{{ m.total_investigations_30d }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Last 30 days</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">LLM Cost</p>
+            <p class="text-2xl font-bold mt-1 {% if m.total_cost_30d <= m.cost_target %}text-ac-green{% else %}text-ac-red{% endif %}">${{ "%.0f"|format(m.total_cost_30d) }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Budget: ${{ "%.0f"|format(m.cost_target) }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Risk Score</p>
+            <p class="text-2xl font-bold mt-1 {% if m.risk_posture_score >= 80 %}text-ac-green{% elif m.risk_posture_score >= 60 %}text-ac-orange{% else %}text-ac-red{% endif %}">{{ m.risk_posture_score }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">/100</p>
+        </div>
+    </div>
+
+    <!-- ============ ROW 2: Alert Volume + MTTD/MTTR Trend ============ -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="ac-card chart-card p-5" onclick="expandChart('volume')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Alert Volume — 30 Day Trend</h3>
+            <div style="height: 280px;"><canvas id="chart-volume"></canvas></div>
+        </div>
+        <div class="ac-card chart-card p-5" onclick="expandChart('mttd-mttr')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">MTTD & MTTR — 30 Day Trend</h3>
+            <div style="height: 280px;"><canvas id="chart-mttd-mttr"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ============ ROW 3: Severity + Outcomes + Top Tactics ============ -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="ac-card chart-card p-5" onclick="expandChart('severity')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Open Investigations by Severity</h3>
+            <div style="height: 260px;" class="flex items-center justify-center"><canvas id="chart-severity"></canvas></div>
+        </div>
+        <div class="ac-card chart-card p-5" onclick="expandChart('outcomes')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Investigation Outcomes (30d)</h3>
+            <div style="height: 260px;" class="flex items-center justify-center"><canvas id="chart-outcomes"></canvas></div>
+        </div>
+        <div class="ac-card chart-card p-5" onclick="expandChart('tactics')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Top MITRE ATT&CK Tactics</h3>
+            <div style="height: 260px;"><canvas id="chart-tactics"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ============ ROW 4: Cost + Automation + SLA ============ -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="ac-card chart-card p-5" onclick="expandChart('cost')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">LLM API Cost — 30 Day Trend</h3>
+            <div style="height: 240px;"><canvas id="chart-cost"></canvas></div>
+        </div>
+        <div class="ac-card chart-card p-5" onclick="expandChart('automation')">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Automation Rate — 30 Day Trend</h3>
+            <div style="height: 240px;"><canvas id="chart-automation"></canvas></div>
+        </div>
+        <!-- SLA (non-chart card, no expand) -->
+        <div class="ac-card p-5">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">SLA Compliance by Severity</h3>
+            <div class="space-y-4 mt-2">
+                {% for sev, data in m.sla_by_severity.items() %}
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-medium
+                            {% if sev == 'critical' %}text-ac-red{% elif sev == 'high' %}text-ac-orange{% elif sev == 'medium' %}text-ac-orange{% else %}text-ac-gray5{% endif %}">
+                            {{ sev|upper }}
+                        </span>
+                        <span class="text-sm font-mono {% if data.pct >= 95 %}text-ac-green{% else %}text-ac-red{% endif %}">{{ data.pct }}%</span>
+                    </div>
+                    <div class="w-full bg-ac-border rounded-full h-3">
+                        <div class="h-3 rounded-full transition-all duration-500
+                            {% if data.pct >= 95 %}bg-ac-green{% elif data.pct >= 90 %}bg-ac-orange{% else %}bg-ac-red{% endif %}"
+                             style="width: {{ data.pct }}%"></div>
+                    </div>
+                    <p class="text-xs text-ac-gray3 mt-1">{{ data.met }}/{{ data.total }} within SLA</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ ROW 5: CTEM + Adversarial AI ============ -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="ac-card p-5">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">CTEM Exposure Posture</h3>
+            <div class="grid grid-cols-4 gap-4 mb-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-ac-red">{{ m.ctem_summary.critical }}</p>
+                    <p class="text-xs text-ac-gray3">Critical</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-ac-orange">{{ m.ctem_summary.high }}</p>
+                    <p class="text-xs text-ac-gray3">High</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-ac-orange">{{ m.ctem_summary.medium }}</p>
+                    <p class="text-xs text-ac-gray3">Medium</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-ac-gray5">{{ m.ctem_summary.low }}</p>
+                    <p class="text-xs text-ac-gray3">Low</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between bg-ac-surface rounded-ac p-3">
+                <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-ac-green"></span>
+                    <span class="text-sm text-ac-gray5">{{ m.ctem_summary.remediated_30d }} remediated (30d)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-ac-red"></span>
+                    <span class="text-sm {% if m.ctem_summary.overdue > 0 %}text-ac-red{% else %}text-ac-green{% endif %}">{{ m.ctem_summary.overdue }} overdue</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-mono text-ac-blue">{{ m.ctem_summary.total }} total</span>
+                </div>
+            </div>
+            <div class="mt-3 h-4 rounded-full overflow-hidden flex">
+                {% set total = m.ctem_summary.total or 1 %}
+                <div class="bg-ac-red" style="width: {{ (m.ctem_summary.critical / total * 100)|round(1) }}%"></div>
+                <div class="bg-ac-orange" style="width: {{ (m.ctem_summary.high / total * 100)|round(1) }}%"></div>
+                <div class="bg-yellow-500" style="width: {{ (m.ctem_summary.medium / total * 100)|round(1) }}%"></div>
+                <div class="bg-ac-gray3" style="width: {{ (m.ctem_summary.low / total * 100)|round(1) }}%"></div>
+            </div>
+        </div>
+
+        <div class="ac-card p-5">
+            <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">Adversarial AI Defense</h3>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-ac-surface rounded-ac p-4 text-center">
+                    <p class="text-3xl font-bold text-ac-green">{{ m.adversarial_summary.blocked }}</p>
+                    <p class="text-xs text-ac-gray3 mt-1">Injection Attempts Blocked</p>
+                    <p class="text-xs text-ac-green mt-1">100% block rate</p>
+                </div>
+                <div class="bg-ac-surface rounded-ac p-4 text-center">
+                    <p class="text-3xl font-bold text-ac-blue">{{ m.adversarial_summary.atlas_detections_30d }}</p>
+                    <p class="text-xs text-ac-gray3 mt-1">ATLAS Detections (30d)</p>
+                </div>
+                <div class="bg-ac-surface rounded-ac p-4 text-center">
+                    <p class="text-3xl font-bold text-ac-purple">{{ m.adversarial_summary.models_monitored }}</p>
+                    <p class="text-xs text-ac-gray3 mt-1">Models Monitored</p>
+                </div>
+                <div class="bg-ac-surface rounded-ac p-4 text-center">
+                    <p class="text-3xl font-bold text-ac-white">${{ "%.2f"|format(m.cost_per_investigation) }}</p>
+                    <p class="text-xs text-ac-gray3 mt-1">Cost per Investigation</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ ROW 6: Key Numbers Summary ============ -->
+    <div class="ac-card p-5">
+        <h3 class="text-sm font-semibold text-ac-gray6 font-montserrat mb-4">30-Day Executive Summary</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">Auto-Closed</p>
+                <p class="text-xl font-bold text-ac-green">{{ m.total_auto_closed }}</p>
+                <p class="text-xs text-ac-gray4">{{ "%.1f"|format(m.total_auto_closed / (m.total_investigations_30d or 1) * 100) }}% of total</p>
+            </div>
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">Escalated</p>
+                <p class="text-xl font-bold text-ac-orange">{{ m.total_escalated }}</p>
+                <p class="text-xs text-ac-gray4">{{ "%.1f"|format(m.total_escalated / (m.total_investigations_30d or 1) * 100) }}% of total</p>
+            </div>
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">True Positives</p>
+                <p class="text-xl font-bold text-ac-red">{{ m.outcomes.true_positive }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">False Positives</p>
+                <p class="text-xl font-bold text-ac-gray5">{{ m.outcomes.false_positive }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">Avg Cost/Alert</p>
+                <p class="text-xl font-bold text-ac-blue">${{ "%.2f"|format(m.cost_per_investigation) }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-ac-gray3 uppercase tracking-wide">CTEM Overdue</p>
+                <p class="text-xl font-bold {% if m.ctem_summary.overdue > 0 %}text-ac-red{% else %}text-ac-green{% endif %}">{{ m.ctem_summary.overdue }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ EXPANDED CHART MODAL ============ -->
+<div id="chart-modal-overlay" class="chart-modal-overlay" onclick="if(event.target===this)closeExpandedChart()">
+    <div class="chart-modal">
+        <div class="chart-modal-header">
+            <h2 id="modal-chart-title" class="text-lg font-semibold font-montserrat text-ac-white"></h2>
+            <div class="flex items-center gap-3">
+                <div class="chart-modal-toolbar">
+                    <button onclick="resetZoom()" title="Reset zoom">Reset Zoom</button>
+                    <button id="btn-toggle-points" onclick="togglePoints()" title="Toggle data points">Points</button>
+                    <button id="btn-toggle-data" onclick="toggleDataPanel()" title="Show raw data table">Data Table</button>
+                    <button onclick="exportChart()" title="Download as PNG">Export PNG</button>
+                </div>
+                <button onclick="closeExpandedChart()" class="text-ac-gray4 hover:text-ac-white transition-colors ml-2" title="Close (Esc)">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="chart-modal-body">
+            <div class="chart-modal-canvas-wrap">
+                <canvas id="expanded-chart-canvas"></canvas>
+            </div>
+            <div id="chart-click-info" class="mt-3 text-sm text-ac-gray5 font-figtree text-center" style="min-height:24px;"></div>
+            <div id="chart-data-panel" class="chart-data-panel">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat font-semibold">Raw Data</span>
+                    <button onclick="copyTableData()" class="text-xs text-ac-gray4 hover:text-ac-white transition-colors">Copy to clipboard</button>
+                </div>
+                <div id="chart-data-table-wrap" class="max-h-64 overflow-auto"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Chart.js Initialization ============ -->
+<script>
+    // -- Global defaults --
+    Chart.defaults.color = '#9ba1a5';
+    Chart.defaults.font.family = 'Montserrat, sans-serif';
+    Chart.defaults.font.size = 11;
+
+    const labels = {{ m.daily_labels|tojson }};
+
+    // -- Chart config registry (stores configs so we can re-create them expanded) --
+    const chartRegistry = {};
+    const chartInstances = {};
+    let expandedChart = null;
+    let expandedChartKey = null;
+    let showingPoints = false;
+    let showingDataPanel = false;
+
+    function registerChart(key, title, config) {
+        chartRegistry[key] = { title, config: JSON.parse(JSON.stringify(config)) };
+        // Store original data for data table
+        chartRegistry[key].originalConfig = config;
+        const canvas = document.getElementById('chart-' + key);
+        chartInstances[key] = new Chart(canvas, config);
+    }
+
+    // -- Zoom plugin config for expanded charts --
+    function addZoomPlugin(opts) {
+        opts.plugins = opts.plugins || {};
+        opts.plugins.zoom = {
+            pan: { enabled: true, mode: 'x', threshold: 5 },
+            zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                drag: { enabled: true, backgroundColor: 'rgba(233,49,26,0.08)', borderColor: '#e9311a', borderWidth: 1 },
+                mode: 'x',
+            },
+        };
+        return opts;
+    }
+
+    // -- Enhanced tooltip for expanded view --
+    function addEnhancedTooltip(opts) {
+        opts.plugins = opts.plugins || {};
+        opts.plugins.tooltip = {
+            backgroundColor: '#18181c',
+            borderColor: '#23232a',
+            borderWidth: 1,
+            titleColor: '#edebe8',
+            bodyColor: '#9ba1a5',
+            titleFont: { family: 'Montserrat, sans-serif', weight: 600, size: 13 },
+            bodyFont: { family: 'Fragment Mono, monospace', size: 12 },
+            padding: 12,
+            cornerRadius: 8,
+            displayColors: true,
+            boxPadding: 4,
+            callbacks: {
+                label: function(ctx) {
+                    let label = ctx.dataset.label || '';
+                    if (label) label += ': ';
+                    if (ctx.parsed.y !== null) {
+                        if (label.includes('Cost') || label.includes('$')) label += '$' + ctx.parsed.y.toFixed(2);
+                        else if (label.includes('%') || label.includes('Rate') || label.includes('Automation')) label += ctx.parsed.y.toFixed(1) + '%';
+                        else label += ctx.parsed.y.toLocaleString();
+                    }
+                    if (ctx.parsed.x !== null && ctx.chart.config.type === 'bar' && ctx.chart.options.indexAxis === 'y') {
+                        label += ctx.parsed.x.toLocaleString();
+                    }
+                    return label;
+                }
+            }
+        };
+        return opts;
+    }
+
+    // -- Click handler for data point inspection --
+    function addClickHandler(opts, key) {
+        opts.onClick = function(evt, elements, chart) {
+            const infoEl = document.getElementById('chart-click-info');
+            if (!elements.length) { infoEl.innerHTML = ''; return; }
+            const el = elements[0];
+            const ds = chart.data.datasets[el.datasetIndex];
+            const label = chart.data.labels[el.index];
+            let value = ds.data[el.index];
+            let dsName = ds.label || 'Value';
+
+            // Format value
+            if (typeof value === 'number') {
+                if (dsName.includes('Cost') || dsName.includes('$')) value = '$' + value.toFixed(2);
+                else if (dsName.includes('%') || dsName.includes('Rate')) value = value.toFixed(1) + '%';
+                else value = value.toLocaleString();
+            }
+
+            infoEl.innerHTML = '<span class="text-ac-gray3">Selected:</span> ' +
+                '<span class="font-mono text-ac-white">' + label + '</span>' +
+                ' <span class="text-ac-gray4">|</span> ' +
+                '<span class="text-ac-gray3">' + dsName + ':</span> ' +
+                '<span class="font-mono text-ac-red font-semibold">' + value + '</span>';
+
+            // Highlight in data table if visible
+            highlightDataRow(el.index);
+        };
+        return opts;
+    }
+
+    // 1. Alert Volume
+    registerChart('volume', 'Alert Volume — 30 Day Trend', {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Total Alerts',
+                    data: {{ m.daily_alerts|tojson }},
+                    borderColor: '#2060df',
+                    backgroundColor: 'rgba(32, 96, 223, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+                {
+                    label: 'Auto-Closed',
+                    data: {{ m.daily_auto_closed|tojson }},
+                    borderColor: '#028d5c',
+                    backgroundColor: 'rgba(2, 141, 92, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+                {
+                    label: 'Escalated',
+                    data: {{ m.daily_escalated|tojson }},
+                    borderColor: '#e9311a',
+                    backgroundColor: 'rgba(233, 49, 26, 0.1)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+            scales: {
+                x: { grid: { color: '#1e1e24' }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+                y: { grid: { color: '#1e1e24' }, beginAtZero: true },
+            },
+        },
+    });
+
+    // 2. MTTD / MTTR Trend
+    registerChart('mttd-mttr', 'MTTD & MTTR — 30 Day Trend', {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'MTTD (seconds)',
+                    data: {{ m.daily_mttd|tojson }},
+                    borderColor: '#2060df',
+                    backgroundColor: 'rgba(32, 96, 223, 0.05)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y',
+                },
+                {
+                    label: 'MTTR (minutes)',
+                    data: {{ m.daily_mttr|tojson }},
+                    borderColor: '#ed6c35',
+                    backgroundColor: 'rgba(237, 108, 53, 0.05)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1',
+                },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+            scales: {
+                x: { grid: { color: '#1e1e24' }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+                y: { grid: { color: '#1e1e24' }, position: 'left', title: { display: true, text: 'MTTD (s)' } },
+                y1: { grid: { drawOnChartArea: false }, position: 'right', title: { display: true, text: 'MTTR (m)' } },
+            },
+        },
+    });
+
+    // 3. Severity Distribution (Doughnut)
+    registerChart('severity', 'Open Investigations by Severity', {
+        type: 'doughnut',
+        data: {
+            labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
+            datasets: [{
+                data: [
+                    {{ m.severity_open.get('critical', 0) }},
+                    {{ m.severity_open.get('high', 0) }},
+                    {{ m.severity_open.get('medium', 0) }},
+                    {{ m.severity_open.get('low', 0) }},
+                    {{ m.severity_open.get('informational', 0) }},
+                ],
+                backgroundColor: ['#e9311a', '#ed6c35', '#d4a017', '#635cad', '#404245'],
+                borderColor: '#18181c', borderWidth: 2,
+            }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } },
+            cutout: '60%',
+        },
+    });
+
+    // 4. Investigation Outcomes (Doughnut)
+    registerChart('outcomes', 'Investigation Outcomes (30d)', {
+        type: 'doughnut',
+        data: {
+            labels: ['True Positive', 'False Positive', 'Escalated'],
+            datasets: [{
+                data: [{{ m.outcomes.true_positive }}, {{ m.outcomes.false_positive }}, {{ m.outcomes.escalated }}],
+                backgroundColor: ['#e9311a', '#404245', '#ed6c35'],
+                borderColor: '#18181c', borderWidth: 2,
+            }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } },
+            cutout: '60%',
+        },
+    });
+
+    // 5. Top MITRE Tactics (Horizontal Bar)
+    registerChart('tactics', 'Top MITRE ATT&CK Tactics', {
+        type: 'bar',
+        data: {
+            labels: {{ m.top_tactics|map(attribute='tactic')|list|tojson }},
+            datasets: [{
+                label: 'Detections',
+                data: {{ m.top_tactics|map(attribute='count')|list|tojson }},
+                backgroundColor: [
+                    'rgba(233,49,26,0.7)', 'rgba(237,108,53,0.7)', 'rgba(212,160,23,0.7)', 'rgba(32,96,223,0.7)',
+                    'rgba(99,92,173,0.7)', 'rgba(2,141,92,0.7)', 'rgba(155,161,165,0.5)', 'rgba(64,66,69,0.7)',
+                ],
+                borderWidth: 0, borderRadius: 4,
+            }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#1e1e24' }, beginAtZero: true },
+                y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            },
+        },
+    });
+
+    // 6. Cost Trend
+    registerChart('cost', 'LLM API Cost — 30 Day Trend', {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Daily Cost ($)',
+                data: {{ m.daily_cost|tojson }},
+                backgroundColor: 'rgba(32, 96, 223, 0.6)',
+                borderRadius: 3, borderWidth: 0,
+            }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#1e1e24' }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+                y: { grid: { color: '#1e1e24' }, beginAtZero: true, ticks: { callback: v => '$' + v } },
+            },
+        },
+    });
+
+    // 7. Automation Rate Trend
+    registerChart('automation', 'Automation Rate — 30 Day Trend', {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Automation Rate (%)',
+                    data: {{ m.daily_automation|tojson }},
+                    borderColor: '#028d5c',
+                    backgroundColor: 'rgba(2, 141, 92, 0.15)',
+                    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                },
+                {
+                    label: 'Target ({{ m.automation_target }}%)',
+                    data: Array(30).fill({{ m.automation_target }}),
+                    borderColor: '#e9311a', borderDash: [6, 4], borderWidth: 1,
+                    pointRadius: 0, fill: false,
+                },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } },
+            scales: {
+                x: { grid: { color: '#1e1e24' }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+                y: { grid: { color: '#1e1e24' }, min: 70, max: 100, ticks: { callback: v => v + '%' } },
+            },
+        },
+    });
+
+
+    // ==================== EXPAND / COLLAPSE LOGIC ====================
+
+    function expandChart(key) {
+        const reg = chartRegistry[key];
+        if (!reg) return;
+
+        expandedChartKey = key;
+        showingPoints = false;
+        showingDataPanel = false;
+
+        // Set title
+        document.getElementById('modal-chart-title').textContent = reg.title;
+
+        // Destroy previous expanded chart
+        if (expandedChart) { expandedChart.destroy(); expandedChart = null; }
+
+        // Deep clone config
+        const cfg = JSON.parse(JSON.stringify(reg.config));
+
+        // Enhance for expanded view
+        cfg.options = cfg.options || {};
+        cfg.options.responsive = true;
+        cfg.options.maintainAspectRatio = false;
+
+        // Show data points on line charts
+        if (cfg.type === 'line') {
+            cfg.data.datasets.forEach(ds => {
+                ds.pointRadius = 3;
+                ds.pointHoverRadius = 6;
+                ds.pointBackgroundColor = ds.borderColor;
+                ds.pointBorderColor = '#18181c';
+                ds.pointBorderWidth = 2;
+            });
+            showingPoints = true;
+        }
+
+        // Enable zoom for line and bar charts (not doughnuts)
+        if (cfg.type !== 'doughnut') {
+            addZoomPlugin(cfg.options);
+        }
+
+        // Enhanced tooltips
+        addEnhancedTooltip(cfg.options);
+
+        // Click handler for data inspection
+        addClickHandler(cfg.options, key);
+
+        // For larger legend in expanded view
+        if (cfg.options.plugins && cfg.options.plugins.legend) {
+            cfg.options.plugins.legend.labels = cfg.options.plugins.legend.labels || {};
+            cfg.options.plugins.legend.labels.font = { size: 13 };
+            cfg.options.plugins.legend.labels.padding = 20;
+        }
+
+        // Larger axis labels in expanded view
+        if (cfg.options.scales) {
+            Object.values(cfg.options.scales).forEach(s => {
+                if (s.ticks) s.ticks.font = { size: 12 };
+                if (s.title) s.title.font = { size: 13 };
+            });
+        }
+
+        // Create expanded chart
+        const canvas = document.getElementById('expanded-chart-canvas');
+        expandedChart = new Chart(canvas, cfg);
+
+        // Reset UI state
+        document.getElementById('chart-click-info').innerHTML = '<span class="text-ac-gray3">Click any data point for details &bull; Scroll to zoom &bull; Drag to select range</span>';
+        document.getElementById('chart-data-panel').classList.remove('show');
+        document.getElementById('btn-toggle-points').classList.toggle('active', showingPoints);
+        document.getElementById('btn-toggle-data').classList.remove('active');
+
+        // Open modal
+        document.getElementById('chart-modal-overlay').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeExpandedChart() {
+        document.getElementById('chart-modal-overlay').classList.remove('open');
+        document.body.style.overflow = '';
+        if (expandedChart) { expandedChart.destroy(); expandedChart = null; }
+        expandedChartKey = null;
+    }
+
+    function resetZoom() {
+        if (expandedChart && expandedChart.resetZoom) expandedChart.resetZoom();
+    }
+
+    function togglePoints() {
+        if (!expandedChart) return;
+        showingPoints = !showingPoints;
+        expandedChart.data.datasets.forEach(ds => {
+            ds.pointRadius = showingPoints ? 3 : 0;
+        });
+        expandedChart.update();
+        document.getElementById('btn-toggle-points').classList.toggle('active', showingPoints);
+    }
+
+    function toggleDataPanel() {
+        showingDataPanel = !showingDataPanel;
+        const panel = document.getElementById('chart-data-panel');
+        panel.classList.toggle('show', showingDataPanel);
+        document.getElementById('btn-toggle-data').classList.toggle('active', showingDataPanel);
+
+        if (showingDataPanel && expandedChart) {
+            buildDataTable();
+        }
+    }
+
+    function buildDataTable() {
+        if (!expandedChart) return;
+        const chart = expandedChart;
+        const labels = chart.data.labels;
+        const datasets = chart.data.datasets;
+        const isDoughnut = chart.config.type === 'doughnut';
+
+        let html = '<table class="chart-data-table"><thead><tr>';
+
+        if (isDoughnut) {
+            html += '<th>Category</th><th>Value</th><th>%</th>';
+            html += '</tr></thead><tbody>';
+            const total = datasets[0].data.reduce((a, b) => a + b, 0);
+            labels.forEach((l, i) => {
+                const val = datasets[0].data[i];
+                const pct = total > 0 ? (val / total * 100).toFixed(1) : '0.0';
+                html += '<tr data-idx="' + i + '"><td>' + l + '</td><td>' + val.toLocaleString() + '</td><td>' + pct + '%</td></tr>';
+            });
+        } else {
+            html += '<th>Date</th>';
+            datasets.forEach(ds => { html += '<th>' + (ds.label || 'Value') + '</th>'; });
+            html += '</tr></thead><tbody>';
+            labels.forEach((l, i) => {
+                html += '<tr data-idx="' + i + '"><td>' + l + '</td>';
+                datasets.forEach(ds => {
+                    let v = ds.data[i];
+                    if (typeof v === 'number') v = v.toLocaleString(undefined, {maximumFractionDigits: 2});
+                    html += '<td>' + v + '</td>';
+                });
+                html += '</tr>';
+            });
+        }
+
+        html += '</tbody></table>';
+        document.getElementById('chart-data-table-wrap').innerHTML = html;
+    }
+
+    function highlightDataRow(idx) {
+        const rows = document.querySelectorAll('#chart-data-table-wrap tr[data-idx]');
+        rows.forEach(r => r.classList.remove('highlight'));
+        const target = document.querySelector('#chart-data-table-wrap tr[data-idx="' + idx + '"]');
+        if (target) {
+            target.classList.add('highlight');
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        // Also refresh table if showing
+        if (showingDataPanel && !document.querySelector('#chart-data-table-wrap table')) {
+            buildDataTable();
+        }
+    }
+
+    function exportChart() {
+        if (!expandedChart) return;
+        const link = document.createElement('a');
+        link.download = (expandedChartKey || 'chart') + '_' + new Date().toISOString().slice(0, 10) + '.png';
+        link.href = expandedChart.toBase64Image('image/png', 1);
+        link.click();
+    }
+
+    function copyTableData() {
+        const table = document.querySelector('#chart-data-table-wrap table');
+        if (!table) return;
+        const rows = Array.from(table.querySelectorAll('tr'));
+        const text = rows.map(r => Array.from(r.querySelectorAll('th, td')).map(c => c.textContent.trim()).join('\t')).join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('[onclick="copyTableData()"]');
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = orig, 1500);
+        });
+    }
+
+    // Keyboard shortcut: Escape to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && expandedChartKey) closeExpandedChart();
+    });
+</script>
+{% endblock %}

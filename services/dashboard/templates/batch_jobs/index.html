@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Batch Job Monitor - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold">Batch Job Monitor</h1>
+        <p class="text-sm text-ac-gray4 mt-1">Tier 2 async batch processing &mdash; FP training, playbook generation, embeddings, IOC refresh, and ATLAS evaluation</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Total Jobs</p>
+            <p class="text-3xl font-bold text-ac-white mt-1">{{ stats.total }}</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Running</p>
+            <p class="text-3xl font-bold text-ac-blue mt-1">{{ stats.running }}</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Queued</p>
+            <p class="text-3xl font-bold text-ac-orange mt-1">{{ stats.queued }}</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Completed Today</p>
+            <p class="text-3xl font-bold text-ac-green mt-1">{{ stats.completed_today }}</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Cost Today</p>
+            <p class="text-3xl font-bold text-ac-white mt-1">${{ stats.cost_today }}</p>
+            <p class="text-xs text-ac-gray3 mt-1">${{ stats.total_cost }} total</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+        <form id="batch-filters" class="flex flex-wrap items-end gap-4">
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Status</label>
+                <select id="filter-status"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="running">Running</option>
+                    <option value="queued">Queued</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Job Type</label>
+                <select id="filter-type"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="fp_pattern_training">FP Pattern Training</option>
+                    <option value="playbook_generation">Playbook Generation</option>
+                    <option value="embedding_migration">Embedding Migration</option>
+                    <option value="incident_indexing">Incident Indexing</option>
+                    <option value="ioc_refresh">IOC Feed Refresh</option>
+                    <option value="atlas_evaluation">ATLAS Evaluation</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">From</label>
+                <input type="date" id="filter-date-from"
+                       class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">To</label>
+                <input type="date" id="filter-date-to"
+                       class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+            </div>
+            <button type="button" onclick="applyFilters()"
+                    class="ac-btn ac-btn-primary">
+                Apply
+            </button>
+            <button type="button" onclick="clearFilters()"
+                    class="ac-btn ac-btn-ghost">
+                Clear
+            </button>
+        </form>
+    </div>
+
+    <!-- Job Table -->
+    <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+        <div class="px-5 py-3 border-b border-ac-border flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-ac-gray6">Batch Jobs</h2>
+            <span class="text-xs text-ac-gray3" id="job-count">{{ jobs|length }} jobs</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-4 py-3 text-left">Status</th>
+                        <th class="px-4 py-3 text-left">Job ID</th>
+                        <th class="px-4 py-3 text-left">Type</th>
+                        <th class="px-4 py-3 text-left">Tier</th>
+                        <th class="px-4 py-3 text-left">Progress</th>
+                        <th class="px-4 py-3 text-left">Duration</th>
+                        <th class="px-4 py-3 text-right">Tokens</th>
+                        <th class="px-4 py-3 text-right">Cost</th>
+                        <th class="px-4 py-3 text-left">Submitted</th>
+                        <th class="px-4 py-3 text-left">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="job-tbody" class="divide-y divide-gray-700/50">
+                    {% for job in jobs %}
+                    <tr class="hover:bg-ac-cardHover/30 cursor-pointer job-row"
+                        onclick="toggleJobDetail(this, '{{ job.job_id }}')"
+                        data-job-id="{{ job.job_id }}">
+                        <td class="px-4 py-3">
+                            <div class="flex items-center space-x-2">
+                                {% if job.status == 'running' %}
+                                <span class="relative flex h-2.5 w-2.5">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-ac-blue opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-ac-blue"></span>
+                                </span>
+                                <span class="text-ac-blue font-medium">Running</span>
+                                {% elif job.status == 'queued' %}
+                                <span class="w-2.5 h-2.5 rounded-full bg-ac-orange"></span>
+                                <span class="text-ac-orange font-medium">Queued</span>
+                                {% elif job.status == 'completed' %}
+                                <span class="w-2.5 h-2.5 rounded-full bg-ac-green"></span>
+                                <span class="text-ac-green font-medium">Completed</span>
+                                {% elif job.status == 'failed' %}
+                                <span class="w-2.5 h-2.5 rounded-full bg-ac-red"></span>
+                                <span class="text-ac-red font-medium">Failed</span>
+                                {% elif job.status == 'cancelled' %}
+                                <span class="w-2.5 h-2.5 rounded-full bg-ac-gray3"></span>
+                                <span class="text-ac-gray3 font-medium">Cancelled</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs text-ac-white">{{ job.job_id }}</td>
+                        <td class="px-4 py-3 text-ac-gray4">{{ job.job_type_label }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-mono bg-ac-surface border border-ac-border text-ac-gray6">{{ job.model_tier }}</span>
+                        </td>
+                        <td class="px-4 py-3" style="min-width: 140px;">
+                            {% if job.total_items > 0 %}
+                            {% set pct = (job.items_processed / job.total_items * 100)|round(0)|int %}
+                            <div class="flex items-center space-x-2">
+                                <div class="flex-1 h-1.5 bg-ac-border rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full
+                                        {% if job.status == 'completed' %}bg-ac-green
+                                        {% elif job.status == 'running' %}bg-ac-blue
+                                        {% elif job.status == 'failed' %}bg-ac-red
+                                        {% elif job.status == 'cancelled' %}bg-ac-gray3
+                                        {% else %}bg-ac-orange{% endif %}"
+                                        style="width: {{ pct }}%"></div>
+                                </div>
+                                <span class="text-xs text-ac-gray4 whitespace-nowrap">{{ job.items_processed|int }}/{{ job.total_items|int }}</span>
+                            </div>
+                            {% else %}
+                            <span class="text-xs text-ac-gray3">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-ac-gray4">{{ job.duration or '&mdash;' }}</td>
+                        <td class="px-4 py-3 text-right text-xs font-mono text-ac-gray4">
+                            {% if job.tokens_input > 0 %}
+                            {{ '{:,}'.format(job.tokens_input) }} / {{ '{:,}'.format(job.tokens_output) }}
+                            {% else %}
+                            &mdash;
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right text-xs font-mono font-semibold text-ac-white">
+                            {% if job.cost_usd > 0 %}${{ '%.2f'|format(job.cost_usd) }}{% else %}&mdash;{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-ac-gray4">
+                            {{ job.submitted_at[:16].replace('T', ' ') }}
+                            <br><span class="text-ac-gray3">{{ job.submitted_by }}</span>
+                        </td>
+                        <td class="px-4 py-3" onclick="event.stopPropagation()">
+                            {% if job.status in ['queued', 'running'] %}
+                            <button onclick="cancelJob('{{ job.job_id }}')"
+                                    class="ac-btn ac-btn-ghost text-xs text-ac-red border-ac-red/30 hover:bg-ac-red/10">
+                                Cancel
+                            </button>
+                            {% else %}
+                            <span class="text-xs text-ac-gray3">&mdash;</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <!-- Expandable detail row -->
+                    <tr class="hidden detail-row bg-ac-surface/60" data-detail-for="{{ job.job_id }}">
+                        <td colspan="10" class="px-6 py-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div class="space-y-2">
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Job ID:</span>
+                                        <span class="font-mono">{{ job.job_id }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Type:</span>
+                                        <span class="font-mono">{{ job.job_type }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Submitted:</span>
+                                        {{ job.submitted_at or '&mdash;' }}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Started:</span>
+                                        {{ job.started_at or '&mdash;' }}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Completed:</span>
+                                        {{ job.completed_at or '&mdash;' }}
+                                    </p>
+                                </div>
+                                <div class="space-y-2">
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Model Tier:</span>
+                                        {{ job.model_tier }}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Input Tokens:</span>
+                                        <span class="font-mono">{{ '{:,}'.format(job.tokens_input) }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Output Tokens:</span>
+                                        <span class="font-mono">{{ '{:,}'.format(job.tokens_output) }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Cost:</span>
+                                        <span class="font-mono font-semibold">${{ '%.2f'|format(job.cost_usd) }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Submitted By:</span>
+                                        {{ job.submitted_by }}
+                                    </p>
+                                </div>
+                                {% if job.error_message %}
+                                <div class="md:col-span-2">
+                                    <p class="text-ac-gray6 font-medium mb-1">Error Details:</p>
+                                    <div class="bg-ac-red/10 border border-ac-red/20 rounded-ac px-4 py-3">
+                                        <p class="text-sm text-ac-red font-mono">{{ job.error_message }}</p>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if not jobs %}
+                    <tr>
+                        <td colspan="10" class="px-4 py-12 text-center text-ac-gray3">
+                            <p class="text-lg">No batch jobs found</p>
+                            <p class="text-sm mt-1">Batch jobs are created automatically by the scheduler or manually via the API.</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+                <!-- Cost footer -->
+                {% if jobs %}
+                <tfoot>
+                    <tr class="border-t border-ac-border bg-ac-surface/40">
+                        <td colspan="7" class="px-4 py-3 text-xs text-ac-gray4 text-right font-medium">Running Total</td>
+                        <td class="px-4 py-3 text-right text-xs font-mono font-bold text-ac-white">
+                            ${{ '%.2f'|format(stats.total_cost) }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function toggleJobDetail(row, jobId) {
+        const detail = document.querySelector('tr[data-detail-for="' + jobId + '"]');
+        if (detail) {
+            detail.classList.toggle('hidden');
+        }
+    }
+
+    function cancelJob(jobId) {
+        if (!confirm('Cancel batch job ' + jobId + '?')) return;
+
+        fetch('/api/batch-jobs/cancel/' + jobId, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'cancelled') {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to cancel job');
+                }
+            })
+            .catch(err => {
+                console.error('Cancel failed:', err);
+                alert('Failed to cancel job');
+            });
+    }
+
+    function applyFilters() {
+        const status = document.getElementById('filter-status').value;
+        const jobType = document.getElementById('filter-type').value;
+        const dateFrom = document.getElementById('filter-date-from').value;
+        const dateTo = document.getElementById('filter-date-to').value;
+
+        const params = new URLSearchParams();
+        if (status) params.set('status', status);
+        if (jobType) params.set('job_type', jobType);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+
+        fetch('/api/batch-jobs/list?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.getElementById('job-tbody');
+                const countEl = document.getElementById('job-count');
+                countEl.textContent = data.count + ' jobs';
+
+                if (data.jobs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="10" class="px-4 py-12 text-center text-ac-gray3">
+                                <p class="text-lg">No jobs match filters</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                let html = '';
+                data.jobs.forEach(job => {
+                    const statusDot = {
+                        running: '<span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-ac-blue opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-ac-blue"></span></span><span class="text-ac-blue font-medium">Running</span>',
+                        queued: '<span class="w-2.5 h-2.5 rounded-full bg-ac-orange"></span><span class="text-ac-orange font-medium">Queued</span>',
+                        completed: '<span class="w-2.5 h-2.5 rounded-full bg-ac-green"></span><span class="text-ac-green font-medium">Completed</span>',
+                        failed: '<span class="w-2.5 h-2.5 rounded-full bg-ac-red"></span><span class="text-ac-red font-medium">Failed</span>',
+                        cancelled: '<span class="w-2.5 h-2.5 rounded-full bg-ac-gray3"></span><span class="text-ac-gray3 font-medium">Cancelled</span>',
+                    }[job.status] || '';
+
+                    const pct = job.total_items > 0 ? Math.round(job.items_processed / job.total_items * 100) : 0;
+                    const barColor = {running: 'bg-ac-blue', completed: 'bg-ac-green', failed: 'bg-ac-red', cancelled: 'bg-ac-gray3', queued: 'bg-ac-orange'}[job.status] || 'bg-ac-blue';
+
+                    const progress = job.total_items > 0
+                        ? `<div class="flex items-center space-x-2"><div class="flex-1 h-1.5 bg-ac-border rounded-full overflow-hidden"><div class="h-full rounded-full ${barColor}" style="width: ${pct}%"></div></div><span class="text-xs text-ac-gray4 whitespace-nowrap">${job.items_processed}/${job.total_items}</span></div>`
+                        : '<span class="text-xs text-ac-gray3">\u2014</span>';
+
+                    const tokens = job.tokens_input > 0
+                        ? job.tokens_input.toLocaleString() + ' / ' + job.tokens_output.toLocaleString()
+                        : '\u2014';
+
+                    const cost = job.cost_usd > 0 ? '$' + job.cost_usd.toFixed(2) : '\u2014';
+
+                    const cancelBtn = (job.status === 'queued' || job.status === 'running')
+                        ? `<button onclick="event.stopPropagation(); cancelJob('${job.job_id}')" class="ac-btn ac-btn-ghost text-xs text-ac-red border-ac-red/30 hover:bg-ac-red/10">Cancel</button>`
+                        : '<span class="text-xs text-ac-gray3">\u2014</span>';
+
+                    const submitted = (job.submitted_at || '').substring(0, 16).replace('T', ' ');
+
+                    html += `
+                        <tr class="hover:bg-ac-cardHover/30 cursor-pointer job-row"
+                            onclick="toggleJobDetail(this, '${job.job_id}')"
+                            data-job-id="${job.job_id}">
+                            <td class="px-4 py-3"><div class="flex items-center space-x-2">${statusDot}</div></td>
+                            <td class="px-4 py-3 font-mono text-xs text-ac-white">${job.job_id}</td>
+                            <td class="px-4 py-3 text-ac-gray4">${job.job_type_label}</td>
+                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-mono bg-ac-surface border border-ac-border text-ac-gray6">${job.model_tier}</span></td>
+                            <td class="px-4 py-3" style="min-width: 140px;">${progress}</td>
+                            <td class="px-4 py-3 text-xs text-ac-gray4">${job.duration || '\u2014'}</td>
+                            <td class="px-4 py-3 text-right text-xs font-mono text-ac-gray4">${tokens}</td>
+                            <td class="px-4 py-3 text-right text-xs font-mono font-semibold text-ac-white">${cost}</td>
+                            <td class="px-4 py-3 text-xs text-ac-gray4">${submitted}<br><span class="text-ac-gray3">${job.submitted_by}</span></td>
+                            <td class="px-4 py-3" onclick="event.stopPropagation()">${cancelBtn}</td>
+                        </tr>`;
+
+                    // Error detail row for failed jobs
+                    if (job.error_message) {
+                        html += `
+                            <tr class="hidden detail-row bg-ac-surface/60" data-detail-for="${job.job_id}">
+                                <td colspan="10" class="px-6 py-4">
+                                    <p class="text-ac-gray6 font-medium mb-1 text-sm">Error Details:</p>
+                                    <div class="bg-ac-red/10 border border-ac-red/20 rounded-ac px-4 py-3">
+                                        <p class="text-sm text-ac-red font-mono">${job.error_message}</p>
+                                    </div>
+                                </td>
+                            </tr>`;
+                    } else {
+                        html += `<tr class="hidden detail-row bg-ac-surface/60" data-detail-for="${job.job_id}"><td colspan="10" class="px-6 py-4"><span class="text-sm text-ac-gray4">No additional details.</span></td></tr>`;
+                    }
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(err => console.error('Filter fetch failed:', err));
+    }
+
+    function clearFilters() {
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-type').value = '';
+        document.getElementById('filter-date-from').value = '';
+        document.getElementById('filter-date-to').value = '';
+        window.location.reload();
+    }
+</script>
+{% endblock %}

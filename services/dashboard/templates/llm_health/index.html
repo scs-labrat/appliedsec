@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}LLM Health - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold">LLM Provider Health</h1>
+            <p class="text-sm text-ac-gray4 mt-1">Circuit breaker status, latency metrics, and spend tracking</p>
+        </div>
+        <div class="text-xs text-ac-gray3">
+            <!-- Auto-refresh hint -->
+            <span class="inline-flex items-center space-x-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-ac-green animate-pulse"></span>
+                <span>Auto-refresh: add <code class="font-mono text-ac-gray5">hx-get="/api/llm-health/status" hx-trigger="every 10s"</code> for live polling</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Provider Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for p in providers %}
+        <div class="ac-card p-5">
+            <!-- Header: model name + tier badge -->
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-base font-semibold text-ac-white">{{ p.model_name }}</h3>
+                {% if p.tier == 'Tier 0' %}
+                <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-green/20 text-ac-green">{{ p.tier }}</span>
+                {% elif p.tier == 'Tier 1' %}
+                <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-blue/20 text-ac-blue">{{ p.tier }}</span>
+                {% elif p.tier == 'Tier 1+' %}
+                <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-purple/20 text-ac-purple">{{ p.tier }}</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-orange/20 text-ac-orange">{{ p.tier }}</span>
+                {% endif %}
+            </div>
+
+            <p class="text-xs text-ac-gray3 mb-3 font-mono">{{ p.model_id }}</p>
+
+            <!-- Circuit state indicator -->
+            <div class="flex items-center space-x-2 mb-4">
+                {% if p.circuit_state == 'CLOSED' %}
+                <span class="w-3 h-3 rounded-full bg-ac-green"></span>
+                <span class="text-sm font-medium text-ac-green">Healthy</span>
+                {% elif p.circuit_state == 'HALF_OPEN' %}
+                <span class="w-3 h-3 rounded-full bg-ac-orange"></span>
+                <span class="text-sm font-medium text-ac-orange">Degraded</span>
+                {% else %}
+                <span class="w-3 h-3 rounded-full bg-ac-red"></span>
+                <span class="text-sm font-medium text-ac-red">Circuit Open</span>
+                {% endif %}
+            </div>
+
+            <!-- Latency bar chart (p50 / p95) -->
+            <div class="mb-4">
+                <p class="text-xs text-ac-gray4 mb-1">Latency</p>
+                {% set max_latency = 10000 %}
+                <div class="space-y-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-ac-gray5 w-8">p50</span>
+                        <div class="flex-1 bg-ac-border rounded h-3 overflow-hidden">
+                            <div class="h-full rounded
+                                {% if p.latency_p50_ms < 500 %}bg-ac-green{% elif p.latency_p50_ms < 2000 %}bg-ac-blue{% elif p.latency_p50_ms < 5000 %}bg-ac-orange{% else %}bg-ac-red{% endif %}"
+                                 style="width: {{ [(p.latency_p50_ms / max_latency * 100), 100] | min }}%"></div>
+                        </div>
+                        <span class="text-xs font-mono text-ac-gray6 w-16 text-right">{{ p.latency_p50_ms }}ms</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-ac-gray5 w-8">p95</span>
+                        <div class="flex-1 bg-ac-border rounded h-3 overflow-hidden">
+                            <div class="h-full rounded
+                                {% if p.latency_p95_ms < 1000 %}bg-ac-green{% elif p.latency_p95_ms < 3000 %}bg-ac-blue{% elif p.latency_p95_ms < 6000 %}bg-ac-orange{% else %}bg-ac-red{% endif %}"
+                                 style="width: {{ [(p.latency_p95_ms / max_latency * 100), 100] | min }}%"></div>
+                        </div>
+                        <span class="text-xs font-mono text-ac-gray6 w-16 text-right">{{ p.latency_p95_ms }}ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success rate -->
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-ac-gray4">Success Rate</span>
+                <span class="text-sm font-mono font-medium
+                    {% if p.success_rate >= 99 %}text-ac-green{% elif p.success_rate >= 95 %}text-ac-orange{% else %}text-ac-red{% endif %}">
+                    {{ p.success_rate }}%
+                </span>
+            </div>
+
+            <!-- Requests/min -->
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-ac-gray4">Requests/min</span>
+                <span class="text-sm font-mono text-ac-gray6">{{ p.requests_per_min }}</span>
+            </div>
+
+            <!-- Errors (if any) -->
+            {% if p.errors_recent %}
+            <div class="mt-2 px-2 py-1.5 rounded bg-ac-red/10 border border-ac-red/20">
+                <p class="text-xs text-ac-red">{{ p.errors_recent }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Reset Breaker button (admin only, non-CLOSED states) -->
+            {% if p.circuit_state != 'CLOSED' and user_role == 'admin' %}
+            <button onclick="resetBreaker('{{ p.provider_id }}', '{{ p.model_name }}')"
+                    class="mt-3 w-full bg-ac-orange/20 hover:bg-ac-orange/40 text-ac-orange px-3 py-1.5 rounded text-xs font-medium">
+                Reset Circuit Breaker
+            </button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Spend Section -->
+    <div class="ac-card p-5">
+        <h2 class="text-lg font-semibold mb-4">Spend Tracking</h2>
+
+        <!-- Spend summary cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-ac-surface rounded-ac border border-ac-border p-4">
+                <p class="text-xs text-ac-gray4 uppercase tracking-wide">Today</p>
+                <p class="text-xl font-bold mt-1 font-mono">${{ "%.2f" | format(spend.today_usd) }}</p>
+            </div>
+            <div class="bg-ac-surface rounded-ac border border-ac-border p-4">
+                <p class="text-xs text-ac-gray4 uppercase tracking-wide">This Week</p>
+                <p class="text-xl font-bold mt-1 font-mono">${{ "%.2f" | format(spend.this_week_usd) }}</p>
+            </div>
+            <div class="bg-ac-surface rounded-ac border border-ac-border p-4">
+                <p class="text-xs text-ac-gray4 uppercase tracking-wide">This Month</p>
+                <p class="text-xl font-bold mt-1 font-mono">${{ "%.2f" | format(spend.this_month_usd) }}</p>
+            </div>
+            <div class="bg-ac-surface rounded-ac border border-ac-border p-4">
+                <p class="text-xs text-ac-gray4 uppercase tracking-wide">Projected Monthly</p>
+                <p class="text-xl font-bold mt-1 font-mono
+                    {% if spend.projected_monthly_usd > spend.budget_monthly_usd %}text-ac-red{% else %}text-ac-gray6{% endif %}">
+                    ${{ "%.2f" | format(spend.projected_monthly_usd) }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Budget progress bar -->
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-ac-gray4">Monthly Budget</span>
+                <span class="text-sm font-mono text-ac-gray6">
+                    ${{ "%.2f" | format(spend.this_month_usd) }} / ${{ "%.2f" | format(spend.budget_monthly_usd) }}
+                    <span class="text-ac-gray3 ml-1">({{ spend.budget_pct }}%)</span>
+                </span>
+            </div>
+            <div class="w-full bg-ac-border rounded h-4 overflow-hidden">
+                <div class="h-full rounded transition-all duration-500
+                    {% if spend.budget_pct < 60 %}bg-ac-green{% elif spend.budget_pct < 80 %}bg-ac-orange{% else %}bg-ac-red{% endif %}"
+                     style="width: {{ [spend.budget_pct, 100] | min }}%"></div>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+                <span class="text-xs text-ac-gray3">Remaining: ${{ "%.2f" | format(spend.budget_remaining_usd) }}</span>
+                {% if spend.budget_pct >= 80 %}
+                <span class="text-xs text-ac-red font-medium">Budget warning: {{ spend.budget_pct }}% consumed</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Per-model horizontal bar chart -->
+        <div>
+            <h3 class="text-sm font-medium text-ac-gray5 mb-3">Spend by Model</h3>
+            <div class="space-y-3">
+                {% for m in spend.by_model %}
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-ac-gray6">{{ m.model }}</span>
+                        <span class="text-sm font-mono text-ac-gray6">${{ "%.2f" | format(m.spend_usd) }} <span class="text-ac-gray3">({{ m.pct }}%)</span></span>
+                    </div>
+                    <div class="w-full bg-ac-border rounded h-3 overflow-hidden">
+                        <div class="h-full rounded {{ m.color }}" style="width: {{ m.pct }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Metrics Table -->
+    <div class="ac-card p-5">
+        <h2 class="text-lg font-semibold mb-4">Detailed Provider Metrics</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-ac-border">
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Provider</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Circuit</th>
+                        <th class="text-center py-3 px-3 text-ac-gray4 font-medium">Failures</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Last Error</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Fallback</th>
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Tokens In (1h)</th>
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Tokens Out (1h)</th>
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Cost (1h)</th>
+                        <th class="text-center py-3 px-3 text-ac-gray4 font-medium">Concurrency</th>
+                        <th class="text-center py-3 px-3 text-ac-gray4 font-medium">Rate Limit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in providers %}
+                    <tr class="border-b border-ac-border/50 hover:bg-ac-cardHover">
+                        <!-- Provider name -->
+                        <td class="py-3 px-3">
+                            <div>
+                                <p class="text-ac-white font-medium">{{ p.model_name }}</p>
+                                <p class="text-xs text-ac-gray3">{{ p.provider }} &middot; {{ p.tier_label }}</p>
+                            </div>
+                        </td>
+
+                        <!-- Circuit state -->
+                        <td class="py-3 px-3">
+                            <div class="flex items-center space-x-1.5">
+                                {% if p.circuit_state == 'CLOSED' %}
+                                <span class="w-2 h-2 rounded-full bg-ac-green"></span>
+                                <span class="text-xs text-ac-green">CLOSED</span>
+                                {% elif p.circuit_state == 'HALF_OPEN' %}
+                                <span class="w-2 h-2 rounded-full bg-ac-orange"></span>
+                                <span class="text-xs text-ac-orange">HALF_OPEN</span>
+                                {% else %}
+                                <span class="w-2 h-2 rounded-full bg-ac-red"></span>
+                                <span class="text-xs text-ac-red">OPEN</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Failure count -->
+                        <td class="py-3 px-3 text-center">
+                            <span class="font-mono {% if p.failure_count > 0 %}text-ac-orange{% else %}text-ac-gray5{% endif %}">
+                                {{ p.failure_count }} / {{ p.failure_threshold }}
+                            </span>
+                        </td>
+
+                        <!-- Last error -->
+                        <td class="py-3 px-3">
+                            {% if p.last_failure_time %}
+                            <p class="text-xs text-ac-gray6">{{ p.last_failure_error }}</p>
+                            <p class="text-xs text-ac-gray3">{{ p.last_failure_time }}</p>
+                            {% else %}
+                            <span class="text-xs text-ac-gray3">&mdash;</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Fallback target -->
+                        <td class="py-3 px-3 text-xs text-ac-gray5">
+                            {{ p.fallback_target or '&mdash;' }}
+                        </td>
+
+                        <!-- Token usage -->
+                        <td class="py-3 px-3 text-right font-mono text-ac-gray6">
+                            {{ "{:,}".format(p.tokens_input_1h) }}
+                        </td>
+                        <td class="py-3 px-3 text-right font-mono text-ac-gray6">
+                            {{ "{:,}".format(p.tokens_output_1h) }}
+                        </td>
+
+                        <!-- Cost 1h -->
+                        <td class="py-3 px-3 text-right font-mono text-ac-gray6">
+                            ${{ "%.2f" | format(p.cost_1h_usd) }}
+                        </td>
+
+                        <!-- Concurrency -->
+                        <td class="py-3 px-3 text-center">
+                            <span class="font-mono text-ac-gray6">{{ p.concurrency_current }}</span>
+                            <span class="text-ac-gray3">/</span>
+                            <span class="font-mono text-ac-gray5">{{ p.concurrency_max }}</span>
+                        </td>
+
+                        <!-- Rate limit -->
+                        <td class="py-3 px-3 text-center">
+                            <span class="font-mono text-ac-gray6">{{ p.rate_limit_current }}</span>
+                            <span class="text-ac-gray3">/</span>
+                            <span class="font-mono text-ac-gray5">{{ p.rate_limit_max }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // -- Reset circuit breaker --
+    async function resetBreaker(providerId, modelName) {
+        if (!confirm('Reset circuit breaker for "' + modelName + '"? This will force the state to CLOSED.')) return;
+        try {
+            const resp = await fetch('/api/llm-health/reset-breaker', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ provider_id: providerId }),
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert('Error: ' + (err.detail || 'Failed to reset breaker'));
+            }
+        } catch (ex) {
+            alert('Network error: ' + ex.message);
+        }
+    }
+</script>
+{% endblock %}

@@ -30,7 +30,7 @@ async def _fetch_metrics() -> dict[str, Any]:
     try:
         # Investigations by state
         rows = await db.fetch_many(
-            "SELECT state, COUNT(*) AS count FROM investigations GROUP BY state"
+            "SELECT state, COUNT(*) AS count FROM investigation_state GROUP BY state"
         )
         by_state = {dict(r)["state"]: dict(r)["count"] for r in rows}
         metrics["by_state"] = by_state
@@ -42,10 +42,10 @@ async def _fetch_metrics() -> dict[str, Any]:
         # Severity breakdown (last 24h)
         rows = await db.fetch_many(
             """
-            SELECT graphstate_json->>'severity' AS severity, COUNT(*) AS count
-            FROM investigations
+            SELECT graph_state->>'severity' AS severity, COUNT(*) AS count
+            FROM investigation_state
             WHERE updated_at >= NOW() - INTERVAL '24 hours'
-            GROUP BY graphstate_json->>'severity'
+            GROUP BY graph_state->>'severity'
             """
         )
         metrics["by_severity_24h"] = {
@@ -57,7 +57,7 @@ async def _fetch_metrics() -> dict[str, Any]:
         row = await db.fetch_one(
             """
             SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) AS avg_seconds
-            FROM investigations
+            FROM investigation_state
             WHERE state = 'closed'
               AND updated_at >= NOW() - INTERVAL '7 days'
             """
@@ -74,9 +74,9 @@ async def _fetch_metrics() -> dict[str, Any]:
         row = await db.fetch_one(
             """
             SELECT
-                COUNT(*) FILTER (WHERE graphstate_json->>'classification' = 'false_positive') AS fp_count,
+                COUNT(*) FILTER (WHERE graph_state->>'classification' = 'false_positive') AS fp_count,
                 COUNT(*) AS total
-            FROM investigations
+            FROM investigation_state
             WHERE state = 'closed'
             """
         )

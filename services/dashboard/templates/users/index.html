@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block title %}Users & Roles - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold">Users &amp; Roles</h1>
+            <p class="text-sm text-ac-gray4 mt-1">Manage SOC analysts, roles, and access permissions</p>
+        </div>
+        {% if user_role == 'admin' %}
+        <button onclick="document.getElementById('create-user-modal').classList.remove('hidden')"
+                class="bg-ac-blue hover:bg-ac-blueDark text-white px-4 py-2 rounded text-sm font-medium">
+            + Create User
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Total Users</p>
+            <p class="text-2xl font-bold mt-1">{{ summary.total }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Active</p>
+            <p class="text-2xl font-bold mt-1 text-ac-green">{{ summary.active }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Inactive</p>
+            <p class="text-2xl font-bold mt-1 text-ac-gray3">{{ summary.inactive }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Admins</p>
+            <p class="text-2xl font-bold mt-1 text-ac-red">{{ summary.admins }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Senior Analysts</p>
+            <p class="text-2xl font-bold mt-1 text-ac-orange">{{ summary.senior_analysts }}</p>
+        </div>
+        <div class="ac-card p-4">
+            <p class="text-xs text-ac-gray4 uppercase tracking-wide">Analysts</p>
+            <p class="text-2xl font-bold mt-1 text-ac-blue">{{ summary.analysts }}</p>
+        </div>
+    </div>
+
+    <!-- Role Permissions Matrix -->
+    <div class="ac-card p-5">
+        <h2 class="text-lg font-semibold mb-4">Role Permissions Matrix</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-ac-border">
+                        <th class="text-left py-2 px-3 text-ac-gray4 font-medium">Permission</th>
+                        <th class="text-center py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-blue/20 text-ac-blue">Analyst</span>
+                        </th>
+                        <th class="text-center py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-orange/20 text-ac-orange">Senior Analyst</span>
+                        </th>
+                        <th class="text-center py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-red/20 text-ac-red">Admin</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="text-ac-gray6">
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">View investigations</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">View approvals</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">View dashboards</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">Approve / reject actions</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">Manage FP patterns</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">Kill switch</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">User management</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr class="border-b border-ac-border/50">
+                        <td class="py-2 px-3">System configuration</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 px-3">Connectors</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-gray3">&mdash;</td>
+                        <td class="text-center py-2 px-3 text-ac-green">&#10003;</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- User Table -->
+    <div class="ac-card p-5">
+        <h2 class="text-lg font-semibold mb-4">All Users</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="users-table">
+                <thead>
+                    <tr class="border-b border-ac-border">
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">User</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Role</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Title</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Status</th>
+                        <th class="text-left py-3 px-3 text-ac-gray4 font-medium">Last Login</th>
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Investigations</th>
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Approvals</th>
+                        {% if user_role == 'admin' %}
+                        <th class="text-right py-3 px-3 text-ac-gray4 font-medium">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="border-b border-ac-border/50 hover:bg-ac-cardHover" id="user-row-{{ user.user_id }}">
+                        <!-- User name + email -->
+                        <td class="py-3 px-3">
+                            <div class="flex items-center space-x-3">
+                                <!-- Activity indicator -->
+                                {% if user.status == 'inactive' %}
+                                <span class="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" title="Inactive"></span>
+                                {% elif user.last_login_display and ('m ago' in user.last_login_display or user.last_login_display == '1h ago') %}
+                                <span class="w-2 h-2 rounded-full bg-ac-green flex-shrink-0" title="Active recently (< 1h)"></span>
+                                {% elif user.last_login_display and ('h ago' in user.last_login_display) %}
+                                <span class="w-2 h-2 rounded-full bg-ac-orange flex-shrink-0" title="Active today (< 24h)"></span>
+                                {% else %}
+                                <span class="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" title="Inactive (> 24h)"></span>
+                                {% endif %}
+                                <div>
+                                    <p class="text-ac-white font-medium">{{ user.display_name }}</p>
+                                    <p class="text-xs text-ac-gray3">{{ user.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Role badge -->
+                        <td class="py-3 px-3">
+                            {% if user.role == 'admin' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-red/20 text-ac-red">Admin</span>
+                            {% elif user.role == 'senior_analyst' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-orange/20 text-ac-orange">Senior Analyst</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-blue/20 text-ac-blue">Analyst</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Title -->
+                        <td class="py-3 px-3 text-ac-gray6">{{ user.title }}</td>
+
+                        <!-- Status -->
+                        <td class="py-3 px-3">
+                            {% if user.status == 'active' %}
+                            <span class="flex items-center text-xs text-ac-green">
+                                <span class="w-1.5 h-1.5 rounded-full bg-ac-green mr-1.5"></span> Active
+                            </span>
+                            {% else %}
+                            <span class="flex items-center text-xs text-ac-gray3">
+                                <span class="w-1.5 h-1.5 rounded-full bg-gray-500 mr-1.5"></span> Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Last login -->
+                        <td class="py-3 px-3 text-ac-gray6 text-sm">{{ user.last_login_display }}</td>
+
+                        <!-- Investigations -->
+                        <td class="py-3 px-3 text-right font-mono text-ac-gray6">{{ user.investigations_handled }}</td>
+
+                        <!-- Approvals -->
+                        <td class="py-3 px-3 text-right font-mono text-ac-gray6">{{ user.approvals_made }}</td>
+
+                        <!-- Admin actions -->
+                        {% if user_role == 'admin' %}
+                        <td class="py-3 px-3 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <!-- Role change dropdown -->
+                                <select onchange="changeRole('{{ user.user_id }}', this.value)"
+                                        class="bg-ac-border border border-ac-borderLight rounded px-2 py-1 text-xs text-ac-white focus:outline-none focus:border-ac-red">
+                                    <option value="analyst" {% if user.role == 'analyst' %}selected{% endif %}>Analyst</option>
+                                    <option value="senior_analyst" {% if user.role == 'senior_analyst' %}selected{% endif %}>Senior Analyst</option>
+                                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                                </select>
+
+                                <!-- Deactivate button -->
+                                {% if user.status == 'active' %}
+                                <button onclick="deactivateUser('{{ user.user_id }}', '{{ user.display_name }}')"
+                                        class="bg-ac-red/20 hover:bg-ac-red/40 text-ac-red px-2 py-1 rounded text-xs font-medium">
+                                    Deactivate
+                                </button>
+                                {% else %}
+                                <span class="text-xs text-ac-gray3 px-2">Deactivated</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-12 text-ac-gray3">
+                            <p class="text-lg">No users found.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal (admin only) -->
+{% if user_role == 'admin' %}
+<div id="create-user-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="bg-ac-card rounded-ac border border-ac-border w-full max-w-lg mx-4 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">Create User</h2>
+            <button onclick="document.getElementById('create-user-modal').classList.add('hidden')"
+                    class="text-ac-gray4 hover:text-ac-white text-xl">&times;</button>
+        </div>
+
+        <form id="create-user-form" class="space-y-4">
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Display Name</label>
+                <input name="display_name" type="text" required placeholder="e.g. Jane Doe"
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Email</label>
+                <input name="email" type="email" required placeholder="e.g. j.doe@aluskort.io"
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Role</label>
+                <select name="role" required
+                        class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+                    <option value="analyst">Analyst</option>
+                    <option value="senior_analyst">Senior Analyst</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Title / Position</label>
+                <input name="title" type="text" placeholder="e.g. L1 Analyst"
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button"
+                        onclick="document.getElementById('create-user-modal').classList.add('hidden')"
+                        class="px-4 py-2 rounded text-sm text-ac-gray4 hover:text-ac-white">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="bg-ac-blue hover:bg-ac-blueDark text-white px-4 py-2 rounded text-sm font-medium">
+                    Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    // -- Create user --
+    const createForm = document.getElementById('create-user-form');
+    if (createForm) {
+        createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = new FormData(e.target);
+            const body = {
+                display_name: data.get('display_name'),
+                email: data.get('email'),
+                role: data.get('role'),
+                title: data.get('title'),
+            };
+            try {
+                const resp = await fetch('/api/users/create', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                });
+                if (resp.ok) {
+                    document.getElementById('create-user-modal').classList.add('hidden');
+                    window.location.reload();
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.detail || 'Failed to create user'));
+                }
+            } catch (ex) {
+                alert('Network error: ' + ex.message);
+            }
+        });
+    }
+
+    // -- Change role --
+    async function changeRole(userId, newRole) {
+        try {
+            const resp = await fetch('/api/users/update-role', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_id: userId, role: newRole }),
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert('Error: ' + (err.detail || 'Failed to update role'));
+            }
+        } catch (ex) {
+            alert('Network error: ' + ex.message);
+        }
+    }
+
+    // -- Deactivate user --
+    async function deactivateUser(userId, displayName) {
+        if (!confirm('Deactivate user "' + displayName + '"? They will lose access.')) return;
+        try {
+            const resp = await fetch('/api/users/deactivate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_id: userId }),
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert('Error: ' + (err.detail || 'Failed to deactivate user'));
+            }
+        } catch (ex) {
+            alert('Network error: ' + ex.message);
+        }
+    }
+</script>
+{% endblock %}

@@ -105,6 +105,15 @@ from services.dashboard.routes.test_harness import router as test_harness_router
 from services.dashboard.routes.ctem import router as ctem_router  # noqa: E402
 from services.dashboard.routes.cti import router as cti_router  # noqa: E402
 from services.dashboard.routes.adversarial_ai import router as adversarial_ai_router  # noqa: E402
+from services.dashboard.routes.shadow_mode import router as shadow_mode_router  # noqa: E402
+from services.dashboard.routes.canary import router as canary_router  # noqa: E402
+from services.dashboard.routes.fp_patterns import router as fp_patterns_router  # noqa: E402
+from services.dashboard.routes.audit_trail import router as audit_trail_router  # noqa: E402
+from services.dashboard.routes.playbooks import router as playbooks_router  # noqa: E402
+from services.dashboard.routes.batch_jobs import router as batch_jobs_router  # noqa: E402
+from services.dashboard.routes.users import router as users_router  # noqa: E402
+from services.dashboard.routes.llm_health import router as llm_health_router  # noqa: E402
+from services.dashboard.routes.ciso import router as ciso_router  # noqa: E402
 from services.dashboard.middleware.auth import RBACMiddleware  # noqa: E402
 from services.dashboard.ws import websocket_investigations  # noqa: E402
 
@@ -124,6 +133,15 @@ app.include_router(test_harness_router)
 app.include_router(ctem_router)
 app.include_router(cti_router)
 app.include_router(adversarial_ai_router)
+app.include_router(shadow_mode_router)
+app.include_router(canary_router)
+app.include_router(fp_patterns_router)
+app.include_router(audit_trail_router)
+app.include_router(playbooks_router)
+app.include_router(batch_jobs_router)
+app.include_router(users_router)
+app.include_router(llm_health_router)
+app.include_router(ciso_router)
 
 
 # ------------------------------------------------------------------

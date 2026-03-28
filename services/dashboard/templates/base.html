@@ -148,6 +148,10 @@
             border-radius: 4px;
         }
 
+        /* Nav dropdown */
+        .nav-dropdown-menu { transition: opacity 0.15s ease, transform 0.15s ease; }
+        .nav-dropdown-menu.show { display: block !important; }
+
         /* Smooth page transitions */
         .section-content { transition: opacity 0.15s ease; }
 
@@ -171,15 +175,51 @@
 
                     <!-- Nav links -->
                     <div class="flex items-center space-x-1">
+                        <a href="/ciso" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">CISO</a>
                         <a href="/overview" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Overview</a>
                         <a href="/investigations" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Investigations</a>
                         <a href="/approvals" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Approvals</a>
-                        <a href="/ctem" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">CTEM</a>
-                        <a href="/cti" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">CTI</a>
-                        <a href="/adversarial-ai" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Adversarial AI</a>
-                        <a href="/connectors" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Connectors</a>
-                        <a href="/settings" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Settings</a>
-                        <a href="/test-harness" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Test Harness</a>
+
+                        <!-- Threat Intel dropdown -->
+                        <div class="relative nav-dropdown">
+                            <button class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat flex items-center" onclick="toggleDropdown(this)">
+                                Threat Intel <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="nav-dropdown-menu hidden absolute left-0 top-full mt-1 w-48 rounded-ac border border-ac-border bg-ac-card shadow-lg z-50">
+                                <a href="/ctem" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">CTEM Exposures</a>
+                                <a href="/cti" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">CTI / IOC Feeds</a>
+                                <a href="/adversarial-ai" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Adversarial AI</a>
+                                <a href="/fp-patterns" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">FP Patterns</a>
+                                <a href="/playbooks" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Playbooks</a>
+                            </div>
+                        </div>
+
+                        <!-- Platform dropdown -->
+                        <div class="relative nav-dropdown">
+                            <button class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat flex items-center" onclick="toggleDropdown(this)">
+                                Platform <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="nav-dropdown-menu hidden absolute left-0 top-full mt-1 w-48 rounded-ac border border-ac-border bg-ac-card shadow-lg z-50">
+                                <a href="/llm-health" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">LLM Health</a>
+                                <a href="/shadow-mode" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Shadow Mode</a>
+                                <a href="/canary" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Canary Rollout</a>
+                                <a href="/batch-jobs" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Batch Jobs</a>
+                                <a href="/audit" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Audit Trail</a>
+                                <a href="/connectors" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Connectors</a>
+                            </div>
+                        </div>
+
+                        <!-- Admin dropdown -->
+                        <div class="relative nav-dropdown">
+                            <button class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat flex items-center" onclick="toggleDropdown(this)">
+                                Admin <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="nav-dropdown-menu hidden absolute left-0 top-full mt-1 w-48 rounded-ac border border-ac-border bg-ac-card shadow-lg z-50">
+                                <a href="/users" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Users & Roles</a>
+                                <a href="/settings" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Settings</a>
+                                <a href="/test-harness" class="block px-4 py-2 text-sm text-ac-gray5 hover:bg-ac-cardHover hover:text-ac-white font-figtree">Test Harness</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="text-xs text-ac-gray3 font-figtree">
@@ -202,17 +242,42 @@
         </div>
     </footer>
 
-    <!-- Highlight active nav link -->
+    <!-- Highlight active nav link + dropdown logic -->
     <script>
         (function() {
             const path = window.location.pathname;
-            document.querySelectorAll('.nav-link').forEach(link => {
+            // Highlight direct nav links
+            document.querySelectorAll('a.nav-link').forEach(link => {
                 const href = link.getAttribute('href');
-                if (path === href || (href !== '/' && path.startsWith(href))) {
+                if (href && (path === href || (href !== '/' && path.startsWith(href)))) {
                     link.classList.add('active');
                 }
             });
+            // Highlight dropdown parent if child is active
+            document.querySelectorAll('.nav-dropdown-menu a').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && (path === href || (href !== '/' && path.startsWith(href)))) {
+                    link.classList.add('bg-ac-cardHover', 'text-ac-white');
+                    const btn = link.closest('.nav-dropdown').querySelector('button');
+                    if (btn) btn.classList.add('active', 'text-ac-white');
+                }
+            });
         })();
+
+        function toggleDropdown(btn) {
+            const menu = btn.nextElementSibling;
+            const isOpen = menu.classList.contains('show');
+            // Close all dropdowns first
+            document.querySelectorAll('.nav-dropdown-menu').forEach(m => m.classList.remove('show'));
+            if (!isOpen) menu.classList.add('show');
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-dropdown')) {
+                document.querySelectorAll('.nav-dropdown-menu').forEach(m => m.classList.remove('show'));
+            }
+        });
     </script>
 </body>
 </html>

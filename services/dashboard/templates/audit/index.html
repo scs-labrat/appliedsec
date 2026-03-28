@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% block title %}Audit Trail - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ============ Header ============ -->
+    <div>
+        <h1 class="text-2xl font-bold">Audit Trail</h1>
+        <p class="text-sm text-ac-gray4 mt-1">Immutable, hash-chained audit log with integrity verification for all SOC platform actions</p>
+    </div>
+
+    <!-- ============ Summary Cards ============ -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Total Records</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-blue"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-white">{{ summary.total }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">All audit trail entries</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Records Today</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-purple"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-purple">{{ summary.today }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Events logged in the last 24h</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Chain Integrity</span>
+                {% if summary.chain_integrity == 'verified' %}
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-green"></span>
+                {% else %}
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-red"></span>
+                {% endif %}
+            </div>
+            {% if summary.chain_integrity == 'verified' %}
+            <p class="text-3xl font-bold text-ac-green">Verified</p>
+            {% else %}
+            <p class="text-3xl font-bold text-ac-red">Broken</p>
+            {% endif %}
+            <p class="text-xs text-ac-gray4 mt-1">Hash chain continuity status</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Last Verified</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-gray3"></span>
+            </div>
+            <p class="text-lg font-bold text-ac-white mt-1">{{ summary.last_verified[:16] }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Most recent chain verification</p>
+        </div>
+    </div>
+
+    <!-- ============ Filter Bar ============ -->
+    <div class="ac-card p-4">
+        <div class="flex flex-wrap items-end gap-4">
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Event Type</label>
+                <select id="filter-event-type"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white focus:border-ac-red"
+                        onchange="applyFilters()">
+                    <option value="">All Events</option>
+                    {% for et in event_types %}
+                    <option value="{{ et }}">{{ et }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Tenant</label>
+                <select id="filter-tenant"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white focus:border-ac-red"
+                        onchange="applyFilters()">
+                    <option value="">All Tenants</option>
+                    {% for t in tenants %}
+                    <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1 min-w-[160px]">
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Actor</label>
+                <input id="filter-actor" type="text" placeholder="Search by actor..."
+                       class="w-full bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white"
+                       oninput="applyFilters()">
+            </div>
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Date From</label>
+                <input id="filter-date-from" type="date"
+                       class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white"
+                       onchange="applyFilters()">
+            </div>
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Date To</label>
+                <input id="filter-date-to" type="date"
+                       class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white"
+                       onchange="applyFilters()">
+            </div>
+            <div>
+                <button onclick="verifyChain()" class="ac-btn ac-btn-primary flex items-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span>Verify Chain</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Chain Verification Result ============ -->
+    <div id="verify-result" class="hidden">
+        <div id="verify-result-inner" class="ac-card p-5"></div>
+    </div>
+
+    <!-- ============ Audit Record Table ============ -->
+    <div class="ac-card overflow-hidden">
+        <div class="px-5 py-4 border-b border-ac-border">
+            <h2 class="text-md font-semibold text-ac-white">Audit Records</h2>
+            <p class="text-xs text-ac-gray3 mt-1">{{ records|length }} records with SHA-256 hash chain linkage</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="audit-table">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-4 py-2 text-left w-8">Chain</th>
+                        <th class="px-4 py-2 text-left">ID</th>
+                        <th class="px-4 py-2 text-left">Timestamp</th>
+                        <th class="px-4 py-2 text-left">Event Type</th>
+                        <th class="px-4 py-2 text-left">Actor</th>
+                        <th class="px-4 py-2 text-left">Role</th>
+                        <th class="px-4 py-2 text-left">Tenant</th>
+                        <th class="px-4 py-2 text-left">Description</th>
+                        <th class="px-4 py-2 text-left">Hash</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for r in records %}
+                    <tr class="hover:bg-ac-cardHover/30 audit-row cursor-pointer"
+                        data-event-type="{{ r.event_type }}"
+                        data-actor="{{ r.actor|lower }}"
+                        data-tenant="{{ r.tenant_id }}"
+                        data-timestamp="{{ r.timestamp }}"
+                        onclick="toggleDetail({{ r.record_id }})">
+                        <!-- Chain status icon -->
+                        <td class="px-4 py-3">
+                            {% if r.chain_status == 'verified' %}
+                            <div class="flex items-center justify-center" title="Chain link verified">
+                                <svg class="w-4 h-4 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                </svg>
+                            </div>
+                            {% elif r.chain_status == 'broken' %}
+                            <div class="flex items-center justify-center" title="Chain link BROKEN">
+                                <svg class="w-4 h-4 text-ac-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                </svg>
+                            </div>
+                            {% else %}
+                            <div class="flex items-center justify-center" title="Unverified">
+                                <svg class="w-4 h-4 text-ac-gray3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01"/>
+                                </svg>
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Record ID -->
+                        <td class="px-4 py-3 font-mono text-ac-blue text-xs font-semibold">#{{ r.record_id }}</td>
+
+                        <!-- Timestamp -->
+                        <td class="px-4 py-3 text-xs text-ac-gray5 font-mono whitespace-nowrap">{{ r.timestamp[:19] }}</td>
+
+                        <!-- Event Type -->
+                        <td class="px-4 py-3">
+                            {% if r.event_type.startswith('alert.') %}
+                            <span class="ac-badge bg-ac-blue/20 text-ac-blue">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('approval.granted') %}
+                            <span class="ac-badge bg-ac-green/20 text-ac-green">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('approval.denied') %}
+                            <span class="ac-badge bg-ac-orange/20 text-ac-orange">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('fp_pattern.') %}
+                            <span class="ac-badge bg-ac-purple/20 text-ac-purple">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('kill_switch.') %}
+                            <span class="ac-badge bg-ac-red/20 text-ac-red">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('config.') %}
+                            <span class="ac-badge bg-ac-orange/15 text-ac-orange">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('canary.') %}
+                            <span class="ac-badge bg-ac-green/15 text-ac-green">{{ r.event_type }}</span>
+                            {% elif r.event_type.startswith('user.') %}
+                            <span class="ac-badge bg-ac-border text-ac-gray5">{{ r.event_type }}</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-border text-ac-gray4">{{ r.event_type }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actor -->
+                        <td class="px-4 py-3 text-xs text-ac-gray5">{{ r.actor }}</td>
+
+                        <!-- Role -->
+                        <td class="px-4 py-3">
+                            {% if r.role == 'senior_analyst' %}
+                            <span class="text-xs text-ac-orange">{{ r.role }}</span>
+                            {% elif r.role == 'admin' %}
+                            <span class="text-xs text-ac-red">{{ r.role }}</span>
+                            {% elif r.role == 'system' %}
+                            <span class="text-xs text-ac-blue">{{ r.role }}</span>
+                            {% else %}
+                            <span class="text-xs text-ac-gray4">{{ r.role }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Tenant -->
+                        <td class="px-4 py-3 text-xs font-mono text-ac-gray4">{{ r.tenant_id }}</td>
+
+                        <!-- Description (truncated) -->
+                        <td class="px-4 py-3 text-xs text-ac-gray4 max-w-xs truncate" title="{{ r.description }}">{{ r.description }}</td>
+
+                        <!-- Hash (truncated) -->
+                        <td class="px-4 py-3 font-mono text-xs text-ac-gray3" title="Full hash: {{ r.hash }}">{{ r.hash[:12] }}...</td>
+                    </tr>
+
+                    <!-- Expandable detail row -->
+                    <tr class="hidden detail-row-{{ r.record_id }} bg-ac-surface/60">
+                        <td colspan="9" class="px-4 py-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-3">
+                                    <div>
+                                        <span class="text-xs text-ac-gray3 uppercase tracking-wide">Full Description</span>
+                                        <p class="text-sm text-ac-gray5 mt-1">{{ r.description }}</p>
+                                    </div>
+                                    {% if r.investigation_id %}
+                                    <div>
+                                        <span class="text-xs text-ac-gray3 uppercase tracking-wide">Investigation</span>
+                                        <p class="text-sm font-mono text-ac-blue mt-1">{{ r.investigation_id }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="space-y-3">
+                                    <!-- Hash chain visualization -->
+                                    <div>
+                                        <span class="text-xs text-ac-gray3 uppercase tracking-wide">Hash Chain</span>
+                                        <div class="flex items-center space-x-2 mt-2">
+                                            <div class="bg-ac-bg border border-ac-border rounded px-2 py-1">
+                                                <span class="text-xs text-ac-gray3 block">prev_hash</span>
+                                                <span class="text-xs font-mono text-ac-gray5">{{ r.prev_hash }}</span>
+                                            </div>
+                                            <svg class="w-4 h-4 text-ac-gray3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                            </svg>
+                                            <div class="bg-ac-bg border rounded px-2 py-1 {% if r.chain_status == 'verified' %}border-ac-green/40{% else %}border-ac-red/40{% endif %}">
+                                                <span class="text-xs text-ac-gray3 block">current_hash</span>
+                                                <span class="text-xs font-mono {% if r.chain_status == 'verified' %}text-ac-green{% else %}text-ac-red{% endif %}">{{ r.hash }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="mt-1">
+                                            {% if r.chain_status == 'verified' %}
+                                            <span class="text-xs text-ac-green flex items-center space-x-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                <span>Chain link verified</span>
+                                            </span>
+                                            {% else %}
+                                            <span class="text-xs text-ac-red flex items-center space-x-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                <span>Chain link broken</span>
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-4">
+                                        <div>
+                                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">Actor</span>
+                                            <p class="text-sm text-ac-gray5 mt-1">{{ r.actor }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">Role</span>
+                                            <p class="text-sm text-ac-gray5 mt-1">{{ r.role }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">Tenant</span>
+                                            <p class="text-sm font-mono text-ac-gray5 mt-1">{{ r.tenant_id }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============ Hash Chain Info ============ -->
+    <div class="ac-card p-5">
+        <h3 class="text-md font-semibold text-ac-white mb-3">Hash Chain Integrity</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-ac-gray4">
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">SHA-256 Chain</span>
+                </div>
+                <p>Every record's hash is computed from its data concatenated with the previous record's hash, forming an immutable linked chain.</p>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">Tamper Detection</span>
+                </div>
+                <p>Any modification to a past record breaks the chain at that point. The Verify Chain button checks all links for continuity.</p>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">Compliance Ready</span>
+                </div>
+                <p>Audit records cover all SOC actions: classifications, approvals, FP governance, kill switch activations, configuration changes, and logins.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Toast ============ -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+    <div class="bg-ac-card border border-ac-border rounded-ac px-5 py-3 shadow-2xl flex items-center space-x-3">
+        <span id="toast-icon" class="w-5 h-5"></span>
+        <span id="toast-text" class="text-sm text-ac-white"></span>
+    </div>
+</div>
+
+<script>
+    // ---- Row expand/collapse ----
+    function toggleDetail(recordId) {
+        const detail = document.querySelector('.detail-row-' + recordId);
+        if (detail) detail.classList.toggle('hidden');
+    }
+
+    // ---- Client-side filtering ----
+    function applyFilters() {
+        const eventType = document.getElementById('filter-event-type').value;
+        const tenant = document.getElementById('filter-tenant').value;
+        const actor = document.getElementById('filter-actor').value.toLowerCase();
+        const dateFrom = document.getElementById('filter-date-from').value;
+        const dateTo = document.getElementById('filter-date-to').value;
+
+        document.querySelectorAll('.audit-row').forEach(row => {
+            let show = true;
+            if (eventType && row.dataset.eventType !== eventType) show = false;
+            if (tenant && row.dataset.tenant !== tenant) show = false;
+            if (actor && !row.dataset.actor.includes(actor)) show = false;
+            if (dateFrom && row.dataset.timestamp < dateFrom) show = false;
+            if (dateTo && row.dataset.timestamp > dateTo + 'T23:59:59') show = false;
+            row.style.display = show ? '' : 'none';
+            // Hide detail rows for hidden records
+            const rid = row.querySelector('td:nth-child(2)').textContent.trim().replace('#', '');
+            const detail = document.querySelector('.detail-row-' + rid);
+            if (detail && !show) detail.classList.add('hidden');
+        });
+    }
+
+    // ---- Verify chain ----
+    function verifyChain() {
+        const tenant = document.getElementById('filter-tenant').value;
+        const params = tenant ? '?tenant_id=' + encodeURIComponent(tenant) : '';
+
+        fetch('/api/audit/verify' + params)
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('verify-result');
+                const inner = document.getElementById('verify-result-inner');
+                container.classList.remove('hidden');
+
+                if (data.verified) {
+                    inner.innerHTML =
+                        '<div class="flex items-center space-x-3">' +
+                            '<svg class="w-6 h-6 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>' +
+                            '</svg>' +
+                            '<div>' +
+                                '<p class="text-ac-green font-semibold">Chain Verified</p>' +
+                                '<p class="text-sm text-ac-gray4">' + data.total_records + ' records for ' + data.tenant_id + ' &mdash; all hash links intact. Verified at ' + data.verified_at.substring(0, 19) + '</p>' +
+                            '</div>' +
+                        '</div>';
+                } else {
+                    inner.innerHTML =
+                        '<div class="flex items-center space-x-3">' +
+                            '<svg class="w-6 h-6 text-ac-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>' +
+                            '</svg>' +
+                            '<div>' +
+                                '<p class="text-ac-red font-semibold">Chain Integrity Failure</p>' +
+                                '<p class="text-sm text-ac-gray4">' + data.broken_links.length + ' broken link(s) detected at record ID(s): ' + data.broken_links.join(', ') + '</p>' +
+                            '</div>' +
+                        '</div>';
+                }
+
+                showToast(data.verified ? 'Chain verified successfully' : 'Chain integrity failure detected', data.verified);
+            })
+            .catch(err => showToast('Verification failed: ' + err.message, false));
+    }
+
+    // ---- Toast ----
+    function showToast(text, isSuccess) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toast-text').textContent = text;
+        document.getElementById('toast-icon').innerHTML = isSuccess
+            ? '<svg class="w-5 h-5 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+            : '<svg class="w-5 h-5 text-ac-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+</script>
+{% endblock %}

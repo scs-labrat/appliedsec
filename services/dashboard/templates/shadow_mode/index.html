@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Shadow Mode - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+    <div>
+        <h1 class="text-2xl font-bold font-montserrat">Shadow Mode Management</h1>
+        <p class="text-sm text-ac-gray4 mt-1 font-figtree">Monitor and control per-rule-family shadow mode evaluation, agreement rates, and go-live readiness</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="ac-card p-5">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Total Rule Families</p>
+            <p class="text-2xl font-bold text-ac-white mt-1">{{ summary.total }}</p>
+        </div>
+        <div class="ac-card p-5">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">In Shadow</p>
+            <p class="text-2xl font-bold text-ac-orange mt-1">{{ summary.shadow_count }}</p>
+        </div>
+        <div class="ac-card p-5">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Live</p>
+            <p class="text-2xl font-bold text-ac-green mt-1">{{ summary.live_count }}</p>
+        </div>
+        <div class="ac-card p-5">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Disabled</p>
+            <p class="text-2xl font-bold text-ac-gray3 mt-1">{{ summary.disabled_count }}</p>
+        </div>
+        <div class="ac-card p-5">
+            <p class="text-xs text-ac-gray3 uppercase tracking-wide font-montserrat">Avg Agreement</p>
+            <p class="text-2xl font-bold mt-1 {% if summary.avg_agreement >= 95 %}text-ac-green{% elif summary.avg_agreement >= 80 %}text-ac-orange{% else %}text-ac-red{% endif %}">
+                {{ summary.avg_agreement }}%
+            </p>
+        </div>
+    </div>
+
+    <!-- Global Shadow Mode Toggle -->
+    <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold font-montserrat">Global Shadow Mode</h2>
+                <p class="text-sm text-ac-gray4 mt-1 font-figtree">
+                    When enabled, the system runs full pipeline decisions but logs them without executing.
+                    Analyst decisions are compared for agreement tracking.
+                </p>
+            </div>
+            <div class="flex items-center space-x-3">
+                {% if global_shadow_enabled %}
+                <span class="px-3 py-1 rounded text-sm font-semibold bg-ac-orange/20 text-ac-orange">ACTIVE</span>
+                <span class="text-xs text-ac-gray4 font-figtree">{{ summary.shadow_count }} families in shadow</span>
+                {% else %}
+                <span class="px-3 py-1 rounded text-sm font-semibold bg-ac-green/20 text-ac-green">ALL LIVE</span>
+                <span class="text-xs text-ac-gray4 font-figtree">No families in shadow mode</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Tabs -->
+    <div class="border-b border-ac-border">
+        <nav class="flex space-x-6" id="section-tabs">
+            <button onclick="showShadowSection('all')" data-section="all"
+                    class="section-tab pb-3 text-sm font-medium font-montserrat border-b-2 border-ac-red text-ac-blue">
+                All Families ({{ summary.total }})
+            </button>
+            <button onclick="showShadowSection('shadow')" data-section="shadow"
+                    class="section-tab pb-3 text-sm font-medium font-montserrat border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Shadow ({{ summary.shadow_count }})
+            </button>
+            <button onclick="showShadowSection('live')" data-section="live"
+                    class="section-tab pb-3 text-sm font-medium font-montserrat border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Live ({{ summary.live_count }})
+            </button>
+            <button onclick="showShadowSection('disabled')" data-section="disabled"
+                    class="section-tab pb-3 text-sm font-medium font-montserrat border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Disabled ({{ summary.disabled_count }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- Rule Family Cards -->
+    <div id="shadow-entries" class="space-y-4">
+        {% for entry in entries %}
+        <div class="shadow-entry bg-ac-card rounded-ac border border-ac-border overflow-hidden" data-status="{{ entry.status }}">
+            <div class="p-5">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <!-- Header row -->
+                        <div class="flex items-center space-x-3 mb-2">
+                            <!-- Status dot -->
+                            {% if entry.status == 'live' %}
+                            <span class="w-2.5 h-2.5 rounded-full bg-ac-green inline-block"></span>
+                            {% elif entry.status == 'shadow' %}
+                            <span class="w-2.5 h-2.5 rounded-full bg-ac-orange inline-block"></span>
+                            {% else %}
+                            <span class="w-2.5 h-2.5 rounded-full bg-ac-gray2 inline-block"></span>
+                            {% endif %}
+
+                            <h3 class="text-md font-semibold text-ac-white font-montserrat">{{ entry.display_name }}</h3>
+
+                            <!-- Status badge -->
+                            {% if entry.status == 'live' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-ac-green/20 text-ac-green">LIVE</span>
+                            {% elif entry.status == 'shadow' %}
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-ac-orange/20 text-ac-orange">SHADOW</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-ac-gray2/20 text-ac-gray5">DISABLED</span>
+                            {% endif %}
+
+                            <span class="text-xs font-mono text-ac-gray3">{{ entry.rule_family }}</span>
+                        </div>
+
+                        <p class="text-sm text-ac-gray4 font-figtree mb-4">{{ entry.description }}</p>
+
+                        <!-- Metrics row -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <!-- Agreement Rate -->
+                            <div>
+                                <p class="text-xs text-ac-gray3 uppercase tracking-wide mb-1">Agreement Rate</p>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-lg font-bold {% if entry.agreement_rate >= 95 %}text-ac-green{% elif entry.agreement_rate >= 80 %}text-ac-orange{% else %}text-ac-red{% endif %}">
+                                        {{ entry.agreement_rate }}%
+                                    </span>
+                                </div>
+                                <!-- Progress bar -->
+                                <div class="w-full bg-ac-border rounded-full h-1.5 mt-1">
+                                    <div class="h-1.5 rounded-full {% if entry.agreement_rate >= 95 %}bg-ac-green{% elif entry.agreement_rate >= 80 %}bg-ac-orange{% else %}bg-ac-red{% endif %}"
+                                         style="width: {{ entry.agreement_rate }}%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Sample Size -->
+                            <div>
+                                <p class="text-xs text-ac-gray3 uppercase tracking-wide mb-1">Sample Size</p>
+                                <span class="text-lg font-bold {% if entry.sample_size >= 200 %}text-ac-blue{% else %}text-ac-gray5{% endif %}">
+                                    {{ entry.sample_size }}
+                                </span>
+                                <span class="text-xs text-ac-gray3 ml-1">/ 200 min</span>
+                                <!-- Progress bar for sample completeness -->
+                                {% set sample_pct = [entry.sample_size / 200 * 100, 100] | min %}
+                                <div class="w-full bg-ac-border rounded-full h-1.5 mt-1">
+                                    <div class="h-1.5 rounded-full bg-ac-blue" style="width: {{ sample_pct }}%"></div>
+                                </div>
+                            </div>
+
+                            <!-- FP Precision -->
+                            <div>
+                                <p class="text-xs text-ac-gray3 uppercase tracking-wide mb-1">FP Precision</p>
+                                <span class="text-lg font-bold {% if entry.fp_precision >= 98 %}text-ac-green{% elif entry.fp_precision >= 95 %}text-ac-orange{% else %}text-ac-red{% endif %}">
+                                    {{ entry.fp_precision }}%
+                                </span>
+                            </div>
+
+                            <!-- Missed Critical TPs -->
+                            <div>
+                                <p class="text-xs text-ac-gray3 uppercase tracking-wide mb-1">Missed Critical TPs</p>
+                                <span class="text-lg font-bold {% if entry.missed_critical_tps == 0 %}text-ac-green{% else %}text-ac-red{% endif %}">
+                                    {{ entry.missed_critical_tps }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Detail row -->
+                        <div class="flex items-center space-x-6 text-xs text-ac-gray3 font-figtree">
+                            <span>Created: {{ entry.created_at[:10] if entry.created_at else 'N/A' }}</span>
+                            <span>Last evaluated: {{ entry.last_evaluated_at[:10] if entry.last_evaluated_at else 'Never' }}</span>
+                            <span class="px-2 py-0.5 rounded bg-ac-border text-ac-gray5">{{ entry.go_live_criteria }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="flex flex-col space-y-2 ml-6">
+                        {% if entry.status == 'shadow' %}
+                        <button onclick="toggleShadow('{{ entry.rule_family }}', 'live', this)"
+                                class="ac-btn ac-btn-primary text-xs whitespace-nowrap">
+                            Go Live
+                        </button>
+                        <button onclick="toggleShadow('{{ entry.rule_family }}', 'disabled', this)"
+                                class="ac-btn ac-btn-ghost text-xs whitespace-nowrap">
+                            Disable
+                        </button>
+                        {% elif entry.status == 'live' %}
+                        <button onclick="toggleShadow('{{ entry.rule_family }}', 'shadow', this)"
+                                class="ac-btn text-xs whitespace-nowrap" style="background: rgba(237,108,53,0.15); color: #ed6c35; border: 1px solid rgba(237,108,53,0.3);">
+                            Revert to Shadow
+                        </button>
+                        <button onclick="toggleShadow('{{ entry.rule_family }}', 'disabled', this)"
+                                class="ac-btn ac-btn-ghost text-xs whitespace-nowrap">
+                            Disable
+                        </button>
+                        {% else %}
+                        <button onclick="toggleShadow('{{ entry.rule_family }}', 'shadow', this)"
+                                class="ac-btn text-xs whitespace-nowrap" style="background: rgba(237,108,53,0.15); color: #ed6c35; border: 1px solid rgba(237,108,53,0.3);">
+                            Enable Shadow
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Go-live readiness indicator -->
+            {% if entry.status == 'shadow' %}
+            <div class="border-t border-ac-border bg-ac-surface/50 px-5 py-3">
+                {% set criteria_met = entry.agreement_rate >= 95 and entry.sample_size >= 200 and entry.missed_critical_tps == 0 and entry.fp_precision >= 98 %}
+                <div class="flex items-center space-x-4">
+                    {% if criteria_met %}
+                    <span class="w-2 h-2 rounded-full bg-ac-green inline-block"></span>
+                    <span class="text-sm text-ac-green font-medium font-montserrat">Go-live criteria met</span>
+                    <span class="text-xs text-ac-gray3 font-figtree">Ready for promotion to live</span>
+                    {% else %}
+                    <span class="w-2 h-2 rounded-full bg-ac-orange inline-block"></span>
+                    <span class="text-sm text-ac-orange font-medium font-montserrat">Go-live criteria not met</span>
+                    <div class="flex items-center space-x-2 text-xs text-ac-gray3 font-figtree">
+                        {% if entry.agreement_rate < 95 %}
+                        <span class="px-2 py-0.5 rounded bg-ac-red/10 text-ac-red">Agreement {{ entry.agreement_rate }}% < 95%</span>
+                        {% endif %}
+                        {% if entry.sample_size < 200 %}
+                        <span class="px-2 py-0.5 rounded bg-ac-red/10 text-ac-red">Samples {{ entry.sample_size }} < 200</span>
+                        {% endif %}
+                        {% if entry.missed_critical_tps > 0 %}
+                        <span class="px-2 py-0.5 rounded bg-ac-red/10 text-ac-red">Missed {{ entry.missed_critical_tps }} critical TPs</span>
+                        {% endif %}
+                        {% if entry.fp_precision < 98 %}
+                        <span class="px-2 py-0.5 rounded bg-ac-red/10 text-ac-red">FP precision {{ entry.fp_precision }}% < 98%</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    function showShadowSection(filter) {
+        // Update tabs
+        document.querySelectorAll('.section-tab').forEach(tab => {
+            const isActive = tab.dataset.section === filter;
+            tab.classList.toggle('border-ac-red', isActive);
+            tab.classList.toggle('text-ac-blue', isActive);
+            tab.classList.toggle('border-transparent', !isActive);
+            tab.classList.toggle('text-ac-gray4', !isActive);
+        });
+
+        // Filter entries
+        document.querySelectorAll('.shadow-entry').forEach(entry => {
+            if (filter === 'all') {
+                entry.classList.remove('hidden');
+            } else {
+                entry.classList.toggle('hidden', entry.dataset.status !== filter);
+            }
+        });
+    }
+
+    async function toggleShadow(ruleFamily, newStatus, btn) {
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+
+        try {
+            const resp = await fetch('/api/shadow-mode/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rule_family: ruleFamily, new_status: newStatus }),
+            });
+            const data = await resp.json();
+
+            if (resp.ok && data.ok) {
+                btn.textContent = 'Done!';
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                btn.textContent = 'Failed';
+                alert('Toggle failed: ' + (data.error || 'Unknown error'));
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }, 2000);
+            }
+        } catch (ex) {
+            btn.textContent = 'Error';
+            alert('Network error: ' + ex.message);
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
+    }
+</script>
+{% endblock %}

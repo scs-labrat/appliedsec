@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% block title %}FP Pattern Management - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ============ Header ============ -->
+    <div>
+        <h1 class="text-2xl font-bold">FP Pattern Management</h1>
+        <p class="text-sm text-ac-gray4 mt-1">False-positive pattern library with two-person approval, 90-day expiry governance, and blast-radius scoping</p>
+    </div>
+
+    <!-- ============ Summary Cards ============ -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Total Patterns</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-blue"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-white">{{ summary.total }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">All registered FP patterns</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Active</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-green"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-green">{{ summary.active }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Approved and auto-closing alerts</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Pending Approval</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-orange"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-orange">{{ summary.pending }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Awaiting two-person approval</p>
+        </div>
+        <div class="ac-card p-5">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Expiring &le; 14 Days</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-red"></span>
+            </div>
+            <p class="text-3xl font-bold text-ac-red">{{ summary.expiring_soon }}</p>
+            <p class="text-xs text-ac-gray4 mt-1">Need reaffirmation soon</p>
+        </div>
+    </div>
+
+    <!-- ============ Filter Bar ============ -->
+    <div class="ac-card p-4">
+        <div class="flex flex-wrap items-center gap-4">
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Status</label>
+                <select id="filter-status"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white focus:border-ac-red"
+                        onchange="applyFilters()">
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="pending_approval">Pending Approval</option>
+                    <option value="expired">Expired</option>
+                    <option value="revoked">Revoked</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Rule Family</label>
+                <select id="filter-family"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white focus:border-ac-red"
+                        onchange="applyFilters()">
+                    <option value="">All Families</option>
+                    {% for rf in rule_families %}
+                    <option value="{{ rf }}">{{ rf }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label class="text-xs text-ac-gray3 uppercase tracking-wide block mb-1">Search</label>
+                <input id="filter-search" type="text" placeholder="Search by name or description..."
+                       class="w-full bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white"
+                       oninput="applyFilters()">
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Pattern Table ============ -->
+    <div class="ac-card overflow-hidden">
+        <div class="px-5 py-4 border-b border-ac-border">
+            <h2 class="text-md font-semibold text-ac-white">Pattern Library</h2>
+            <p class="text-xs text-ac-gray3 mt-1">{{ patterns|length }} patterns with two-person governance and 90-day expiry lifecycle</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="patterns-table">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-5 py-2 text-left">ID</th>
+                        <th class="px-5 py-2 text-left">Name</th>
+                        <th class="px-5 py-2 text-left">Rule Family</th>
+                        <th class="px-5 py-2 text-left">Status</th>
+                        <th class="px-5 py-2 text-left">Creator / Approver</th>
+                        <th class="px-5 py-2 text-left">Expiry</th>
+                        <th class="px-5 py-2 text-right">Auto-Closed</th>
+                        <th class="px-5 py-2 text-right">Precision</th>
+                        <th class="px-5 py-2 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for p in patterns %}
+                    <tr class="hover:bg-ac-cardHover/30 pattern-row"
+                        data-status="{{ p.status }}"
+                        data-family="{{ p.rule_family }}"
+                        data-name="{{ p.name|lower }}"
+                        data-desc="{{ p.description|lower }}">
+                        <!-- Pattern ID -->
+                        <td class="px-5 py-3 font-mono text-ac-blue text-xs font-semibold">{{ p.pattern_id }}</td>
+
+                        <!-- Name + Description -->
+                        <td class="px-5 py-3">
+                            <div class="text-ac-gray6 font-medium">{{ p.name }}</div>
+                            <div class="text-xs text-ac-gray3 mt-0.5 max-w-xs truncate" title="{{ p.description }}">{{ p.description }}</div>
+                        </td>
+
+                        <!-- Rule Family -->
+                        <td class="px-5 py-3">
+                            <span class="text-xs font-mono bg-ac-purple/10 text-ac-purple px-2 py-0.5 rounded">{{ p.rule_family }}</span>
+                        </td>
+
+                        <!-- Status -->
+                        <td class="px-5 py-3">
+                            {% if p.status == 'active' %}
+                            <span class="ac-badge bg-ac-green/20 text-ac-green">ACTIVE</span>
+                            {% elif p.status == 'pending_approval' %}
+                            <span class="ac-badge bg-ac-orange/20 text-ac-orange">PENDING</span>
+                            {% elif p.status == 'expired' %}
+                            <span class="ac-badge bg-ac-red/20 text-ac-red">EXPIRED</span>
+                            {% elif p.status == 'revoked' %}
+                            <span class="ac-badge bg-ac-gray1/30 text-ac-gray4">REVOKED</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-border text-ac-gray4">{{ p.status|upper }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Creator / Approver (two-person indicator) -->
+                        <td class="px-5 py-3 text-xs">
+                            <div class="text-ac-gray5">{{ p.creator }}</div>
+                            {% if p.approver %}
+                            <div class="flex items-center space-x-1 mt-0.5">
+                                <svg class="w-3 h-3 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-ac-green">{{ p.approver }}</span>
+                            </div>
+                            {% else %}
+                            <div class="text-ac-gray3 mt-0.5">awaiting approver</div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Expiry with countdown -->
+                        <td class="px-5 py-3">
+                            {% if p.expires_date %}
+                            <div class="text-xs text-ac-gray4">{{ p.expires_date[:10] }}</div>
+                            {% if p.days_until_expiry is not none and p.status == 'active' %}
+                                {% if p.days_until_expiry > 30 %}
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <div class="flex-1 h-1.5 bg-ac-border rounded-full overflow-hidden">
+                                        <div class="h-full bg-ac-green rounded-full" style="width: {{ (p.days_until_expiry / 90 * 100)|int }}%"></div>
+                                    </div>
+                                    <span class="text-xs font-mono text-ac-green">{{ p.days_until_expiry }}d</span>
+                                </div>
+                                {% elif p.days_until_expiry > 10 %}
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <div class="flex-1 h-1.5 bg-ac-border rounded-full overflow-hidden">
+                                        <div class="h-full bg-ac-orange rounded-full" style="width: {{ (p.days_until_expiry / 90 * 100)|int }}%"></div>
+                                    </div>
+                                    <span class="text-xs font-mono text-ac-orange">{{ p.days_until_expiry }}d</span>
+                                </div>
+                                {% else %}
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <div class="flex-1 h-1.5 bg-ac-border rounded-full overflow-hidden">
+                                        <div class="h-full bg-ac-red rounded-full" style="width: {{ (p.days_until_expiry / 90 * 100)|int }}%"></div>
+                                    </div>
+                                    <span class="text-xs font-mono text-ac-red">{{ p.days_until_expiry }}d</span>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                            {% else %}
+                            <span class="text-xs text-ac-gray3">--</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Auto-closed count -->
+                        <td class="px-5 py-3 text-right font-mono text-ac-gray5">{{ p.auto_closed_count }}</td>
+
+                        <!-- Precision score -->
+                        <td class="px-5 py-3 text-right">
+                            {% if p.precision_score > 0 %}
+                                {% if p.precision_score >= 95 %}
+                                <span class="font-mono text-ac-green">{{ "%.1f"|format(p.precision_score) }}%</span>
+                                {% elif p.precision_score >= 80 %}
+                                <span class="font-mono text-ac-orange">{{ "%.1f"|format(p.precision_score) }}%</span>
+                                {% else %}
+                                <span class="font-mono text-ac-red">{{ "%.1f"|format(p.precision_score) }}%</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-ac-gray3">--</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Action Buttons -->
+                        <td class="px-5 py-3 text-center">
+                            <div class="flex items-center justify-center space-x-2">
+                                {% if p.status == 'pending_approval' %}
+                                <button onclick="approvePattern('{{ p.pattern_id }}')"
+                                        class="ac-btn ac-btn-primary text-xs px-3 py-1">
+                                    Approve
+                                </button>
+                                {% endif %}
+                                {% if p.status == 'active' and p.days_until_expiry is not none and p.days_until_expiry <= 30 %}
+                                <button onclick="reaffirmPattern('{{ p.pattern_id }}')"
+                                        class="ac-btn text-xs px-3 py-1 bg-ac-blue/20 text-ac-blue border border-ac-blue/30 hover:bg-ac-blue/30">
+                                    Reaffirm
+                                </button>
+                                {% endif %}
+                                {% if p.status in ['active', 'pending_approval', 'expired'] %}
+                                <button onclick="revokePattern('{{ p.pattern_id }}')"
+                                        class="ac-btn ac-btn-ghost text-xs px-3 py-1 hover:text-ac-red hover:border-ac-red/50">
+                                    Revoke
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Expandable match criteria row -->
+                    <tr class="hidden match-detail-{{ p.pattern_id }} bg-ac-surface/60">
+                        <td colspan="9" class="px-5 py-4">
+                            <div class="flex items-start space-x-8">
+                                <div>
+                                    <span class="text-xs text-ac-gray3 uppercase tracking-wide">Match Criteria</span>
+                                    <pre class="text-xs text-ac-gray5 font-mono mt-1 bg-ac-bg rounded p-3 border border-ac-border">{{ p.match_criteria | tojson(indent=2) }}</pre>
+                                </div>
+                                <div>
+                                    <span class="text-xs text-ac-gray3 uppercase tracking-wide">Description</span>
+                                    <p class="text-sm text-ac-gray4 mt-1 max-w-lg">{{ p.description }}</p>
+                                </div>
+                                {% if p.approval_date %}
+                                <div>
+                                    <span class="text-xs text-ac-gray3 uppercase tracking-wide">Approval Date</span>
+                                    <p class="text-sm text-ac-gray5 mt-1">{{ p.approval_date[:10] }}</p>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <span class="text-xs text-ac-gray3 uppercase tracking-wide">Created</span>
+                                    <p class="text-sm text-ac-gray5 mt-1">{{ p.created_date[:10] }}</p>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============ Match Criteria Legend ============ -->
+    <div class="ac-card p-5">
+        <h3 class="text-md font-semibold text-ac-white mb-3">Governance Rules</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-ac-gray4">
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">Two-Person Approval</span>
+                </div>
+                <p>Every pattern requires approval from a senior analyst who is different from the creator. Same-person approval is blocked.</p>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">90-Day Expiry</span>
+                </div>
+                <p>Patterns expire after 90 days and must be reaffirmed. Colour-coded countdown: green (&gt;30d), orange (10-30d), red (&lt;10d).</p>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <svg class="w-4 h-4 text-ac-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                    </svg>
+                    <span class="text-ac-white font-medium">Revocation + Rollback</span>
+                </div>
+                <p>Revoking a pattern re-opens all investigations it auto-closed, restoring them to the analysis pipeline.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Confirmation Modal ============ -->
+<div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+    <div class="bg-ac-card border border-ac-border rounded-ac p-6 max-w-md w-full mx-4 shadow-2xl">
+        <h3 id="confirm-title" class="text-lg font-semibold text-ac-white mb-2"></h3>
+        <p id="confirm-message" class="text-sm text-ac-gray4 mb-4"></p>
+        <div id="confirm-extra" class="mb-4"></div>
+        <div class="flex items-center justify-end space-x-3">
+            <button onclick="closeModal()" class="ac-btn ac-btn-ghost">Cancel</button>
+            <button id="confirm-action" class="ac-btn ac-btn-primary">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Toast ============ -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+    <div class="bg-ac-card border border-ac-border rounded-ac px-5 py-3 shadow-2xl flex items-center space-x-3">
+        <span id="toast-icon" class="w-5 h-5"></span>
+        <span id="toast-text" class="text-sm text-ac-white"></span>
+    </div>
+</div>
+
+<script>
+    // ---- Row expand on click ----
+    document.querySelectorAll('.pattern-row').forEach(row => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            const pid = this.querySelector('td').textContent.trim();
+            const detail = document.querySelector('.match-detail-' + pid);
+            if (detail) detail.classList.toggle('hidden');
+        });
+    });
+
+    // ---- Client-side filtering ----
+    function applyFilters() {
+        const status = document.getElementById('filter-status').value;
+        const family = document.getElementById('filter-family').value;
+        const search = document.getElementById('filter-search').value.toLowerCase();
+
+        document.querySelectorAll('.pattern-row').forEach(row => {
+            let show = true;
+            if (status && row.dataset.status !== status) show = false;
+            if (family && row.dataset.family !== family) show = false;
+            if (search && !row.dataset.name.includes(search) && !row.dataset.desc.includes(search)) show = false;
+            row.style.display = show ? '' : 'none';
+            // Also hide the detail row
+            const pid = row.querySelector('td').textContent.trim();
+            const detail = document.querySelector('.match-detail-' + pid);
+            if (detail && !show) detail.classList.add('hidden');
+        });
+    }
+
+    // ---- Modal helpers ----
+    function showModal(title, message, extraHtml, onConfirm) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        document.getElementById('confirm-extra').innerHTML = extraHtml || '';
+        document.getElementById('confirm-action').onclick = function() {
+            closeModal();
+            onConfirm();
+        };
+        const modal = document.getElementById('confirm-modal');
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('confirm-modal');
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+
+    function showToast(text, isSuccess) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toast-text').textContent = text;
+        document.getElementById('toast-icon').innerHTML = isSuccess
+            ? '<svg class="w-5 h-5 text-ac-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+            : '<svg class="w-5 h-5 text-ac-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    // ---- Pattern actions ----
+    function approvePattern(patternId) {
+        showModal(
+            'Approve FP Pattern',
+            'Two-person approval: confirm you are a senior analyst approving pattern ' + patternId + '.',
+            '<div><label class="text-xs text-ac-gray3 block mb-1">Your username (senior_analyst)</label>' +
+            '<input id="approve-user" class="w-full bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white" placeholder="sr.analyst.name"></div>',
+            function() {
+                const approver = document.getElementById('approve-user').value || 'sr.analyst.demo';
+                fetch('/api/fp-patterns/approve', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pattern_id: patternId, approver: approver, role: 'senior_analyst'})
+                })
+                .then(r => r.json())
+                .then(data => {
+                    showToast('Pattern ' + patternId + ' approved successfully', true);
+                    setTimeout(() => location.reload(), 1500);
+                })
+                .catch(err => showToast('Approval failed: ' + err.message, false));
+            }
+        );
+    }
+
+    function reaffirmPattern(patternId) {
+        showModal(
+            'Reaffirm FP Pattern',
+            'Extend pattern ' + patternId + ' for another 90 days?',
+            '<div><label class="text-xs text-ac-gray3 block mb-1">Your username</label>' +
+            '<input id="reaffirm-user" class="w-full bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white" placeholder="sr.analyst.name"></div>',
+            function() {
+                const user = document.getElementById('reaffirm-user').value || 'sr.analyst.demo';
+                fetch('/api/fp-patterns/reaffirm', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pattern_id: patternId, reaffirmed_by: user})
+                })
+                .then(r => r.json())
+                .then(data => {
+                    showToast('Pattern ' + patternId + ' reaffirmed for 90 days', true);
+                    setTimeout(() => location.reload(), 1500);
+                })
+                .catch(err => showToast('Reaffirmation failed: ' + err.message, false));
+            }
+        );
+    }
+
+    function revokePattern(patternId) {
+        showModal(
+            'Revoke FP Pattern',
+            'Revoking pattern ' + patternId + ' will re-open all investigations it auto-closed. This cannot be undone.',
+            '<div><label class="text-xs text-ac-gray3 block mb-1">Your username</label>' +
+            '<input id="revoke-user" class="w-full bg-ac-surface border border-ac-border rounded-ac px-3 py-1.5 text-sm text-ac-white" placeholder="sr.analyst.name"></div>' +
+            '<p class="text-xs text-ac-red mt-2">Warning: This is a destructive action.</p>',
+            function() {
+                const user = document.getElementById('revoke-user').value || 'sr.analyst.demo';
+                fetch('/api/fp-patterns/revoke', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({pattern_id: patternId, revoked_by: user})
+                })
+                .then(r => r.json())
+                .then(data => {
+                    showToast('Pattern ' + patternId + ' revoked', true);
+                    setTimeout(() => location.reload(), 1500);
+                })
+                .catch(err => showToast('Revocation failed: ' + err.message, false));
+            }
+        );
+    }
+</script>
+{% endblock %}
