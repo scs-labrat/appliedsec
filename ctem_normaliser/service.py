@@ -172,3 +172,114 @@ class CTEMNormaliserService:
             )
         except Exception:
             logger.warning("Failed to send to DLQ", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Kafka consumer runner
+# ---------------------------------------------------------------------------
+
+class CTEMConsumerRunner:
+    """Wraps CTEMNormaliserService with a confluent-kafka consumer loop."""
+
+    def __init__(
+        self,
+        service: CTEMNormaliserService,
+        kafka_bootstrap: str,
+        consumer_group: str = "aluskort.ctem-normaliser",
+    ) -> None:
+        from confluent_kafka import Consumer as KConsumer, KafkaError, Producer as KProducer
+
+        self._service = service
+        self._consumer = KConsumer({
+            "bootstrap.servers": kafka_bootstrap,
+            "group.id": consumer_group,
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+        })
+        self._running = False
+
+    def start(self) -> None:
+        self._consumer.subscribe(SUBSCRIBED_TOPICS)
+        self._running = True
+        logger.info("CTEM normaliser subscribed to %s", SUBSCRIBED_TOPICS)
+
+    def stop(self) -> None:
+        self._running = False
+
+    async def run(self) -> None:
+        """Async consumer loop."""
+        from confluent_kafka import KafkaError
+
+        self.start()
+        logger.info("CTEM normaliser service running")
+
+        while self._running:
+            msg = self._consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    continue
+                logger.error("Consumer error: %s", msg.error())
+                continue
+
+            try:
+                raw_data = json.loads(msg.value().decode("utf-8"))
+                topic = msg.topic()
+                await self._service.process_message(topic, raw_data)
+                self._consumer.commit(message=msg)
+            except Exception as exc:
+                logger.error("CTEM processing failed: %s", exc, exc_info=True)
+                self._consumer.commit(message=msg)
+
+    def close(self) -> None:
+        self.stop()
+        self._consumer.close()
+
+
+def main() -> None:
+    """Entry point for ``python -m ctem_normaliser.service``."""
+    import asyncio
+    import os
+    import signal
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    )
+
+    kafka_bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    postgres_dsn = os.environ.get("POSTGRES_DSN", "")
+
+    # Repository
+    db = None
+    if postgres_dsn:
+        try:
+            from shared.db.postgres import PostgresClient
+            db = PostgresClient(dsn=postgres_dsn)
+        except Exception:
+            logger.warning("Postgres unavailable — running without persistence")
+
+    repo = CTEMRepository(postgres_client=db)
+    service = CTEMNormaliserService(repository=repo)
+    runner = CTEMConsumerRunner(service=service, kafka_bootstrap=kafka_bootstrap)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, runner.stop)
+        except NotImplementedError:
+            signal.signal(sig, lambda *_: runner.stop())
+
+    try:
+        loop.run_until_complete(runner.run())
+    finally:
+        runner.close()
+        loop.close()
+        logger.info("CTEM normaliser service stopped")
+
+
+if __name__ == "__main__":
+    main()

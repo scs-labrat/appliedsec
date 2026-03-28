@@ -193,3 +193,42 @@ class EntityParserService:
             except KafkaException as exc:
                 logger.error("Producer failed for alert %s: %s", alert_id, exc)
                 # Do NOT commit — allow reprocessing on next poll
+
+
+def main() -> None:
+    """Entry point for ``python -m entity_parser.service``."""
+    import os
+    import signal
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    )
+
+    kafka_bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    svc = EntityParserService(kafka_bootstrap=kafka_bootstrap)
+
+    # Audit producer (optional)
+    try:
+        from shared.audit.producer import AuditProducer
+        svc.audit_producer = AuditProducer(
+            kafka_bootstrap=kafka_bootstrap, service_name="entity-parser",
+        )
+    except Exception:
+        logger.warning("Audit producer unavailable")
+
+    def _shutdown(*_: Any) -> None:
+        svc.stop()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
+    try:
+        svc.run()
+    finally:
+        svc.close()
+        logger.info("Entity parser service stopped")
+
+
+if __name__ == "__main__":
+    main()
