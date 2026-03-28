@@ -32,11 +32,31 @@ credentials.json
 Thumbs.db
 nul
 
-# Claude Code
+# Claude Code / BMAD agent artifacts
 .claude/
+_bmad/
+_bmad-output/
+
+# Runtime databases
+chroma_db/
+
+# Nested repos (not submodules)
+omeriko-agent/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/*.tfplan
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfvars
 
 # pytest
 .pytest_cache/
 htmlcov/
 .coverage
 coverage.xml
+
+# Logs
+*.log
+logs/
