@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS mitre_groups (
     techniques_used JSONB,
     software_used   TEXT[],
     target_sectors  TEXT[],
-    references      TEXT[],
+    "references"    TEXT[],
     last_updated    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

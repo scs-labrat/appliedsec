@@ -77,7 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_severity
     WHERE severity IN ('warning', 'critical');
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_tenant_seq
-    ON audit_records (tenant_id, sequence_number);
+    ON audit_records (tenant_id, sequence_number, timestamp);
 
 -- ============================================================
 -- Immutability trigger — SOC 2 CC6.8 control
