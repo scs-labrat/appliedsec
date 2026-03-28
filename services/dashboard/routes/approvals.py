@@ -29,13 +29,13 @@ async def _fetch_awaiting_investigations() -> list[dict[str, Any]]:
     rows = await db.fetch_many(
         """
         SELECT investigation_id, alert_id, tenant_id, state,
-               graphstate_json->>'severity' AS severity,
-               graphstate_json->>'classification' AS classification,
+               graph_state->>'severity' AS severity,
+               graph_state->>'classification' AS classification,
                updated_at
-        FROM investigations
+        FROM investigation_state
         WHERE state = $1
         ORDER BY
-            CASE graphstate_json->>'severity'
+            CASE graph_state->>'severity'
                 WHEN 'critical' THEN 1
                 WHEN 'high' THEN 2
                 WHEN 'medium' THEN 3

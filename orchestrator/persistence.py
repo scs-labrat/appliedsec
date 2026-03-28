@@ -45,17 +45,19 @@ class InvestigationRepository:
     async def save(self, state: GraphState) -> None:
         """Insert or update an investigation record."""
         state_json = state.model_dump_json()
-        decision_json = json.dumps(state.decision_chain)
         await self._db.execute(
             """
-            INSERT INTO investigations
+            INSERT INTO investigation_state
                 (investigation_id, alert_id, tenant_id, state,
-                 graphstate_json, decision_chain, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, NOW(), NOW())
+                 graph_state, confidence, llm_calls, total_cost_usd,
+                 created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, NOW(), NOW())
             ON CONFLICT (investigation_id) DO UPDATE SET
                 state = $4,
-                graphstate_json = $5::jsonb,
-                decision_chain = $6::jsonb,
+                graph_state = $5::jsonb,
+                confidence = $6,
+                llm_calls = $7,
+                total_cost_usd = $8,
                 updated_at = NOW()
             """,
             state.investigation_id,
@@ -63,18 +65,20 @@ class InvestigationRepository:
             state.tenant_id,
             state.state.value,
             state_json,
-            decision_json,
+            state.confidence,
+            state.llm_calls,
+            state.total_cost_usd,
         )
 
     async def load(self, investigation_id: str) -> GraphState | None:
         """Load GraphState by investigation_id."""
         row = await self._db.fetch_one(
-            "SELECT graphstate_json FROM investigations WHERE investigation_id = $1",
+            "SELECT graph_state FROM investigation_state WHERE investigation_id = $1",
             investigation_id,
         )
         if row is None:
             return None
-        raw = row["graphstate_json"]
+        raw = row["graph_state"]
         data = raw if isinstance(raw, dict) else json.loads(raw)
         return GraphState.model_validate(data)
 
@@ -125,7 +129,7 @@ class InvestigationRepository:
         return await self._db.fetch_many(
             """
             SELECT investigation_id, alert_id, tenant_id, state, updated_at
-            FROM investigations
+            FROM investigation_state
             WHERE state = $1
             ORDER BY updated_at DESC
             LIMIT $2

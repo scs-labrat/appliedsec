@@ -7,7 +7,9 @@ system health.
 
 from __future__ import annotations
 
+import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+logger = logging.getLogger(__name__)
+
 # Resolve paths relative to this file
 _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATE_DIR = _BASE_DIR / "templates"
@@ -23,7 +27,64 @@ _STATIC_DIR = _BASE_DIR / "static"
 
 templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
-app = FastAPI(title="ALUSKORT Analyst Dashboard", version="1.0.0")
+# Infrastructure clients — held at module level for cleanup
+_pg_client: Any = None
+_redis_client: Any = None
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Connect to Postgres and Redis from environment variables on startup."""
+    global _pg_client, _redis_client
+    from services.dashboard.deps import init_deps
+
+    postgres_dsn = os.environ.get("POSTGRES_DSN", "")
+    redis_host = os.environ.get("REDIS_HOST", "")
+
+    db = None
+    if postgres_dsn:
+        try:
+            from shared.db.postgres import PostgresClient
+            db = PostgresClient(dsn=postgres_dsn)
+            await db.connect()
+            _pg_client = db
+            logger.info("Dashboard connected to Postgres")
+        except Exception:
+            logger.warning("Dashboard: Postgres connection failed", exc_info=True)
+
+    rc = None
+    if redis_host:
+        try:
+            from shared.db.redis_cache import RedisClient
+            rc = RedisClient(host=redis_host)
+            await rc.connect()
+            _redis_client = rc
+            logger.info("Dashboard connected to Redis")
+        except Exception:
+            logger.warning("Dashboard: Redis connection failed", exc_info=True)
+
+    init_deps(db, rc)
+
+    yield
+
+    # Cleanup
+    if _pg_client is not None:
+        try:
+            await _pg_client.close()
+        except Exception:
+            pass
+    if _redis_client is not None:
+        try:
+            await _redis_client.close()
+        except Exception:
+            pass
+
+
+app = FastAPI(
+    title="ALUSKORT Analyst Dashboard",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
@@ -38,6 +99,12 @@ from services.dashboard.routes.investigation_detail import router as detail_rout
 from services.dashboard.routes.timeline import router as timeline_router  # noqa: E402
 from services.dashboard.routes.approvals import router as approvals_router  # noqa: E402
 from services.dashboard.routes.metrics import router as metrics_router  # noqa: E402
+from services.dashboard.routes.connectors import router as connectors_router  # noqa: E402
+from services.dashboard.routes.settings import router as settings_router  # noqa: E402
+from services.dashboard.routes.test_harness import router as test_harness_router  # noqa: E402
+from services.dashboard.routes.ctem import router as ctem_router  # noqa: E402
+from services.dashboard.routes.cti import router as cti_router  # noqa: E402
+from services.dashboard.routes.adversarial_ai import router as adversarial_ai_router  # noqa: E402
 from services.dashboard.middleware.auth import RBACMiddleware  # noqa: E402
 from services.dashboard.ws import websocket_investigations  # noqa: E402
 
@@ -51,6 +118,12 @@ app.include_router(detail_router)
 app.include_router(timeline_router)
 app.include_router(approvals_router)
 app.include_router(metrics_router)
+app.include_router(connectors_router)
+app.include_router(settings_router)
+app.include_router(test_harness_router)
+app.include_router(ctem_router)
+app.include_router(cti_router)
+app.include_router(adversarial_ai_router)
 
 
 # ------------------------------------------------------------------

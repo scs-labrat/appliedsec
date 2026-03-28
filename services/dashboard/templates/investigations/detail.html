@@ -5,147 +5,477 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <a href="/investigations" class="text-sm text-gray-400 hover:text-gray-300">&larr; Back to list</a>
+            <a href="/investigations" class="text-sm text-ac-gray4 hover:text-ac-gray6">&larr; Back to list</a>
             <h1 class="text-2xl font-bold mt-1">Investigation {{ inv.investigation_id[:16] }}...</h1>
+            {% if inv.case_facts and inv.case_facts.alert_title %}
+            <p class="text-sm text-ac-gray4 mt-1">{{ inv.case_facts.alert_title }}</p>
+            {% endif %}
         </div>
         <div class="flex items-center space-x-3">
-            <!-- State Badge -->
             {% if inv.state.value == 'reasoning' %}
-            <span class="px-3 py-1 rounded-full text-sm font-medium bg-blue-900 text-blue-300">{{ inv.state.value }}</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-ac-blue/20 text-ac-blue">{{ inv.state.value }}</span>
             {% elif inv.state.value == 'awaiting_human' %}
-            <span class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900 text-yellow-300">{{ inv.state.value }}</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-ac-orange/15 text-ac-orange">{{ inv.state.value }}</span>
             {% elif inv.state.value == 'closed' %}
-            <span class="px-3 py-1 rounded-full text-sm font-medium bg-green-900 text-green-300">{{ inv.state.value }}</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-ac-green/20 text-ac-green">{{ inv.state.value }}</span>
             {% elif inv.state.value == 'failed' %}
-            <span class="px-3 py-1 rounded-full text-sm font-medium bg-red-900 text-red-300">{{ inv.state.value }}</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-ac-red/20 text-ac-red">{{ inv.state.value }}</span>
             {% else %}
-            <span class="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-300">{{ inv.state.value }}</span>
+            <span class="px-3 py-1 rounded-full text-sm font-medium bg-ac-border text-ac-gray6">{{ inv.state.value }}</span>
             {% endif %}
 
             {% if inv.severity %}
             <span class="px-3 py-1 rounded-full text-sm font-medium
-                {% if inv.severity == 'critical' %}bg-red-900 text-red-300
-                {% elif inv.severity == 'high' %}bg-orange-900 text-orange-300
-                {% elif inv.severity == 'medium' %}bg-yellow-900 text-yellow-300
-                {% else %}bg-gray-700 text-gray-400{% endif %}">
+                {% if inv.severity == 'critical' %}bg-ac-red/20 text-ac-red
+                {% elif inv.severity == 'high' %}bg-ac-orange/20 text-ac-orange
+                {% elif inv.severity == 'medium' %}bg-ac-orange/15 text-ac-orange
+                {% else %}bg-ac-border text-ac-gray4{% endif %}">
                 {{ inv.severity }}
             </span>
             {% endif %}
         </div>
     </div>
 
-    <!-- Alert Info -->
-    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+    <!-- Alert Info + Case Facts -->
+    <div class="bg-ac-card rounded-ac p-5 border border-ac-border">
         <h2 class="text-lg font-semibold mb-3">Alert Information</h2>
-        <dl class="grid grid-cols-2 gap-4 text-sm">
+        {% if inv.case_facts and inv.case_facts.alert_description %}
+        <p class="text-sm text-ac-gray6 mb-4 leading-relaxed">{{ inv.case_facts.alert_description }}</p>
+        {% endif %}
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-                <dt class="text-gray-400">Alert ID</dt>
-                <dd class="font-mono">{{ inv.alert_id or '-' }}</dd>
+                <dt class="text-ac-gray4 text-xs">Alert ID</dt>
+                <dd class="font-mono mt-0.5">{{ inv.alert_id or '-' }}</dd>
             </div>
             <div>
-                <dt class="text-gray-400">Tenant</dt>
-                <dd>{{ inv.tenant_id or '-' }}</dd>
+                <dt class="text-ac-gray4 text-xs">Tenant</dt>
+                <dd class="mt-0.5">{{ inv.tenant_id or '-' }}</dd>
             </div>
             <div>
-                <dt class="text-gray-400">Classification</dt>
-                <dd>{{ inv.classification or '-' }}</dd>
+                <dt class="text-ac-gray4 text-xs">Classification</dt>
+                <dd class="mt-0.5">{{ inv.classification or 'Pending' }}</dd>
             </div>
             <div>
-                <dt class="text-gray-400">Confidence</dt>
-                <dd>{{ "%.1f"|format(inv.confidence * 100) }}%</dd>
+                <dt class="text-ac-gray4 text-xs">Confidence</dt>
+                <dd class="mt-0.5">{{ "%.1f"|format(inv.confidence * 100) }}%</dd>
             </div>
         </dl>
+        {% if inv.case_facts and inv.case_facts.tactics %}
+        <div class="flex flex-wrap gap-2 mt-4">
+            {% for t in inv.case_facts.tactics %}
+            <span class="text-xs bg-ac-border/60 text-ac-gray5 px-2 py-0.5 rounded">{{ t }}</span>
+            {% endfor %}
+            {% for t in inv.case_facts.techniques %}
+            <span class="text-xs font-mono bg-ac-border/40 text-ac-gray3 px-2 py-0.5 rounded">{{ t }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
-    <!-- Entities -->
-    {% if inv.entities %}
-    <details class="bg-gray-800 rounded-lg border border-gray-700" open>
-        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">Entities</summary>
-        <div class="px-4 pb-4">
-            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.entities | tojson(indent=2) }}</pre>
+    <!-- Approval Banner (if AWAITING_HUMAN) — placed prominently -->
+    {% if inv.state.value == 'awaiting_human' %}
+    <div class="bg-ac-orange/10 rounded-ac p-5 border border-ac-orange/30">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <h2 class="text-lg font-semibold text-ac-orange mb-2">Analyst Approval Required</h2>
+                <p class="text-sm text-ac-gray6 mb-3">
+                    The reasoning agent has assessed this alert and staged response actions.
+                    Review the recommended actions below and approve or reject.
+                </p>
+
+                {% if inv.recommended_actions %}
+                <div class="space-y-2 mb-4">
+                    {% for act in inv.recommended_actions %}
+                    {% if act.status == 'pending_approval' %}
+                    <div class="bg-ac-card rounded p-3 border border-ac-border">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold
+                                    {% if act.priority == 'critical' %}bg-ac-red/20 text-ac-red
+                                    {% elif act.priority == 'high' %}bg-ac-orange/20 text-ac-orange
+                                    {% else %}bg-ac-border text-ac-gray6{% endif %}">
+                                    {{ act.priority|upper }}
+                                </span>
+                                <span class="text-sm font-medium text-ac-white">{{ act.action|replace('_', ' ')|title }}</span>
+                            </div>
+                            <span class="font-mono text-xs text-ac-gray4">{{ act.target }}</span>
+                        </div>
+                        {% if act.description %}
+                        <p class="text-xs text-ac-gray5 mt-1">{{ act.description }}</p>
+                        {% endif %}
+                        {% if act.risk %}
+                        <p class="text-xs text-ac-orange mt-1">Risk: {{ act.risk }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="flex space-x-3">
+                    <button hx-post="/api/investigations/{{ inv.investigation_id }}/approve"
+                            hx-headers='{"X-User-Role": "senior_analyst"}'
+                            hx-swap="outerHTML"
+                            hx-confirm="Approve all pending actions for this investigation?"
+                            class="bg-ac-green hover:bg-ac-greenDark text-white px-5 py-2 rounded-ac text-sm font-medium">
+                        Approve Actions
+                    </button>
+                    <button hx-post="/api/investigations/{{ inv.investigation_id }}/reject"
+                            hx-headers='{"X-User-Role": "senior_analyst"}'
+                            hx-swap="outerHTML"
+                            hx-confirm="Reject this investigation? Actions will not be executed."
+                            class="bg-ac-red hover:bg-ac-redDark text-white px-5 py-2 rounded-ac text-sm font-medium">
+                        Reject
+                    </button>
+                </div>
+            </div>
         </div>
-    </details>
+    </div>
     {% endif %}
+
+    <!-- Recommended Actions (all states except received) -->
+    {% if inv.recommended_actions %}
+    <div class="bg-ac-card rounded-ac border border-ac-border">
+        <div class="p-4 border-b border-ac-border">
+            <h2 class="text-lg font-semibold">Recommended Actions ({{ inv.recommended_actions|length }})</h2>
+        </div>
+        <div class="divide-y divide-ac-border">
+            {% for act in inv.recommended_actions %}
+            <div class="p-4 hover:bg-ac-cardHover/50">
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center space-x-2">
+                        <!-- Status icon -->
+                        {% if act.status == 'completed' %}
+                        <span class="w-2 h-2 rounded-full bg-ac-green"></span>
+                        {% elif act.status == 'pending_approval' %}
+                        <span class="w-2 h-2 rounded-full bg-ac-orange animate-pulse"></span>
+                        {% else %}
+                        <span class="w-2 h-2 rounded-full bg-ac-gray3"></span>
+                        {% endif %}
+
+                        <span class="text-sm font-medium text-ac-white">{{ act.action|replace('_', ' ')|title }}</span>
+
+                        <span class="px-1.5 py-0.5 rounded text-xs
+                            {% if act.priority == 'critical' %}bg-ac-red/20 text-ac-red
+                            {% elif act.priority == 'high' %}bg-ac-orange/20 text-ac-orange
+                            {% elif act.priority == 'medium' %}bg-ac-blue/15 text-ac-blue
+                            {% else %}bg-ac-border text-ac-gray6{% endif %}">
+                            {{ act.priority }}
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="font-mono text-xs text-ac-gray4">{{ act.target }}</span>
+                        <span class="text-xs px-2 py-0.5 rounded
+                            {% if act.status == 'completed' %}bg-ac-green/20 text-ac-green
+                            {% elif act.status == 'pending_approval' %}bg-ac-orange/15 text-ac-orange
+                            {% else %}bg-ac-border text-ac-gray4{% endif %}">
+                            {{ act.status|replace('_', ' ') }}
+                        </span>
+                    </div>
+                </div>
+                {% if act.description %}
+                <p class="text-xs text-ac-gray5 ml-4">{{ act.description }}</p>
+                {% endif %}
+                {% if act.risk %}
+                <p class="text-xs text-ac-orange/80 ml-4 mt-0.5">{{ act.risk }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Decision Chain / Timeline -->
+    <div class="bg-ac-card rounded-ac p-4 border border-ac-border">
+        <h2 class="text-lg font-semibold mb-3">Decision Chain</h2>
+        <div hx-get="/api/investigations/{{ inv.investigation_id }}/timeline"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <span class="text-ac-gray3 text-sm">Loading timeline...</span>
+        </div>
+    </div>
 
     <!-- IOC Matches -->
     {% if inv.ioc_matches %}
-    <details class="bg-gray-800 rounded-lg border border-gray-700">
-        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">IOC Matches ({{ inv.ioc_matches|length }})</summary>
+    <div class="bg-ac-card rounded-ac border border-ac-border">
+        <div class="p-4 border-b border-ac-border">
+            <h2 class="text-lg font-semibold">IOC Matches ({{ inv.ioc_matches|length }})</h2>
+        </div>
+        <div class="divide-y divide-ac-border">
+            {% for ioc in inv.ioc_matches %}
+            <div class="p-4 hover:bg-ac-cardHover/50">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-1.5 py-0.5 rounded text-xs font-bold bg-ac-border text-ac-gray6">{{ ioc.type|upper }}</span>
+                        <span class="font-mono text-sm text-ac-white">{{ ioc.value }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-ac-gray4">{{ ioc.source }}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded
+                            {% if ioc.confidence >= 0.9 %}bg-ac-red/15 text-ac-red
+                            {% elif ioc.confidence >= 0.7 %}bg-ac-orange/15 text-ac-orange
+                            {% else %}bg-ac-border text-ac-gray4{% endif %}">
+                            {{ "%.0f"|format(ioc.confidence * 100) }}%
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3 text-xs text-ac-gray4 mt-1">
+                    <span>{{ ioc.threat_type|replace('_', ' ')|title }}</span>
+                    {% if ioc.family %}<span>Family: {{ ioc.family }}</span>{% endif %}
+                    {% if ioc.detections %}<span>{{ ioc.detections }}</span>{% endif %}
+                    {% if ioc.first_seen %}<span>First seen: {{ ioc.first_seen }}</span>{% endif %}
+                </div>
+                {% if ioc.note %}
+                <p class="text-xs text-ac-gray5 mt-1">{{ ioc.note }}</p>
+                {% endif %}
+                {% if ioc.tags %}
+                <div class="flex gap-1 mt-1.5">
+                    {% for tag in ioc.tags %}
+                    <span class="text-xs bg-ac-border/50 text-ac-gray3 px-1.5 py-0.5 rounded">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- CTEM Exposures -->
+    {% if inv.ctem_exposures %}
+    <div class="bg-ac-card rounded-ac border border-ac-border">
+        <div class="p-4 border-b border-ac-border">
+            <h2 class="text-lg font-semibold">CTEM Exposures ({{ inv.ctem_exposures|length }})</h2>
+        </div>
+        <div class="divide-y divide-ac-border">
+            {% for exp in inv.ctem_exposures %}
+            <div class="p-4 hover:bg-ac-cardHover/50">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-1.5 py-0.5 rounded text-xs font-bold
+                            {% if exp.severity == 'critical' %}bg-ac-red/20 text-ac-red
+                            {% elif exp.severity == 'high' %}bg-ac-orange/20 text-ac-orange
+                            {% elif exp.severity == 'medium' %}bg-ac-orange/10 text-ac-orange
+                            {% else %}bg-ac-border text-ac-gray6{% endif %}">
+                            {{ exp.severity|upper }}
+                        </span>
+                        <span class="text-sm font-medium text-ac-white">{{ exp.title }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs text-ac-gray4">
+                        <span>{{ exp.source }}</span>
+                        {% if exp.finding_id %}<span class="font-mono">{{ exp.finding_id }}</span>{% endif %}
+                    </div>
+                </div>
+                <p class="text-xs text-ac-gray5 mt-1">{{ exp.description }}</p>
+                <div class="flex items-center space-x-4 text-xs mt-2">
+                    {% if exp.asset %}<span class="text-ac-gray4">Asset: <span class="text-ac-gray6">{{ exp.asset }}</span></span>{% endif %}
+                    {% if exp.cve %}<span class="font-mono text-ac-red">{{ exp.cve }}</span>{% endif %}
+                </div>
+                {% if exp.remediation %}
+                <p class="text-xs text-ac-blue mt-1.5">Remediation: {{ exp.remediation }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Entities -->
+    {% if inv.entities %}
+    <details class="bg-ac-card rounded-ac border border-ac-border">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-ac-blue">Entities</summary>
         <div class="px-4 pb-4">
-            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.ioc_matches | tojson(indent=2) }}</pre>
+            {% set ents = inv.entities %}
+            {% if ents.accounts %}
+            <div class="mb-3">
+                <h3 class="text-xs text-ac-gray4 uppercase tracking-wider mb-1.5">Accounts</h3>
+                <div class="space-y-1">
+                    {% for a in ents.accounts %}
+                    <div class="flex items-center space-x-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-ac-purple"></span>
+                        <span class="text-ac-white">{{ a.Name }}</span>
+                        {% if a.UPNSuffix %}<span class="text-ac-gray4">@{{ a.UPNSuffix }}</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if ents.hosts %}
+            <div class="mb-3">
+                <h3 class="text-xs text-ac-gray4 uppercase tracking-wider mb-1.5">Hosts</h3>
+                <div class="space-y-1">
+                    {% for h in ents.hosts %}
+                    <div class="flex items-center space-x-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-ac-blue"></span>
+                        <span class="font-mono text-ac-white">{{ h.HostName }}</span>
+                        {% if h.OSFamily %}<span class="text-xs text-ac-gray4">({{ h.OSFamily }})</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if ents.ips %}
+            <div class="mb-3">
+                <h3 class="text-xs text-ac-gray4 uppercase tracking-wider mb-1.5">IP Addresses</h3>
+                <div class="space-y-1">
+                    {% for ip in ents.ips %}
+                    <div class="flex items-center space-x-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-ac-orange"></span>
+                        <span class="font-mono text-ac-white">{{ ip.Address }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if ents.processes %}
+            <div class="mb-3">
+                <h3 class="text-xs text-ac-gray4 uppercase tracking-wider mb-1.5">Processes</h3>
+                <div class="space-y-1">
+                    {% for p in ents.processes %}
+                    <div class="text-sm">
+                        <span class="w-2 h-2 rounded-full bg-ac-green inline-block"></span>
+                        <span class="text-ac-gray4">PID {{ p.ProcessId }}:</span>
+                        <span class="font-mono text-xs text-ac-gray6">{{ p.CommandLine }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if ents.dns_records %}
+            <div class="mb-3">
+                <h3 class="text-xs text-ac-gray4 uppercase tracking-wider mb-1.5">DNS Records</h3>
+                <div class="space-y-1">
+                    {% for d in ents.dns_records %}
+                    <div class="flex items-center space-x-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-ac-red"></span>
+                        <span class="font-mono text-ac-white">{{ d.DomainName }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </details>
     {% endif %}
 
-    <!-- CTEM Correlations -->
-    {% if inv.ctem_exposures %}
-    <details class="bg-gray-800 rounded-lg border border-gray-700">
-        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">CTEM Exposures ({{ inv.ctem_exposures|length }})</summary>
-        <div class="px-4 pb-4">
-            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.ctem_exposures | tojson(indent=2) }}</pre>
+    <!-- UEBA Context -->
+    {% if inv.ueba_context %}
+    <details class="bg-ac-card rounded-ac border border-ac-border">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-ac-blue">UEBA Context ({{ inv.ueba_context|length }})</summary>
+        <div class="px-4 pb-4 space-y-3">
+            {% for ctx in inv.ueba_context %}
+            <div class="bg-ac-bg rounded p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-ac-white">{{ ctx.entity }}</span>
+                    <span class="text-xs px-2 py-0.5 rounded
+                        {% if ctx.risk_score >= 0.8 %}bg-ac-red/15 text-ac-red
+                        {% elif ctx.risk_score >= 0.5 %}bg-ac-orange/15 text-ac-orange
+                        {% else %}bg-ac-border text-ac-gray4{% endif %}">
+                        Risk: {{ "%.0f"|format(ctx.risk_score * 100) }}%
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-ac-gray4">
+                    <div>Anomalies: <span class="text-ac-gray6">{{ ctx.anomalies }}</span></div>
+                    <div>Deviation: <span class="text-ac-gray6">{{ ctx.baseline_deviation }}</span></div>
+                    <div>Recent alerts: <span class="text-ac-gray6">{{ ctx.recent_alerts }}</span></div>
+                    {% if ctx.peer_group_rank %}<div>Peer rank: <span class="text-ac-gray6">{{ ctx.peer_group_rank }}</span></div>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- Similar Incidents -->
+    {% if inv.similar_incidents %}
+    <details class="bg-ac-card rounded-ac border border-ac-border">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-ac-blue">Similar Incidents ({{ inv.similar_incidents|length }})</summary>
+        <div class="px-4 pb-4 space-y-2">
+            {% for inc in inv.similar_incidents %}
+            <div class="flex items-center justify-between bg-ac-bg rounded p-3">
+                <div>
+                    <p class="text-sm text-ac-white">{{ inc.alert_title }}</p>
+                    <p class="text-xs text-ac-gray4 mt-0.5">{{ inc.outcome }}</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs px-2 py-0.5 rounded bg-ac-blue/15 text-ac-blue">{{ "%.0f"|format(inc.similarity_score * 100) }}% match</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+
+    <!-- Playbook Matches -->
+    {% if inv.playbook_matches %}
+    <details class="bg-ac-card rounded-ac border border-ac-border">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-ac-blue">Matched Playbooks ({{ inv.playbook_matches|length }})</summary>
+        <div class="px-4 pb-4 space-y-2">
+            {% for pb in inv.playbook_matches %}
+            <div class="bg-ac-bg rounded p-3">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-mono text-xs text-ac-gray4">{{ pb.playbook_id }}</span>
+                        <span class="text-sm font-medium text-ac-white">{{ pb.playbook_name }}</span>
+                    </div>
+                    <span class="text-xs text-ac-gray4">{{ "%.0f"|format(pb.match_confidence * 100) }}% confidence</span>
+                </div>
+                <div class="flex items-center space-x-2 mt-1.5">
+                    <span class="text-xs text-ac-gray4">Tactic: {{ pb.tactic }}</span>
+                    <span class="text-ac-gray3">|</span>
+                    <span class="text-xs text-ac-gray4">Actions: {{ pb.actions|join(', ') }}</span>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </details>
     {% endif %}
 
     <!-- ATLAS Techniques -->
     {% if inv.atlas_techniques %}
-    <details class="bg-gray-800 rounded-lg border border-gray-700">
-        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-blue-400">ATLAS Techniques ({{ inv.atlas_techniques|length }})</summary>
+    <details class="bg-ac-card rounded-ac border border-ac-border">
+        <summary class="p-4 cursor-pointer text-lg font-semibold hover:text-ac-blue">ATLAS Techniques ({{ inv.atlas_techniques|length }})</summary>
         <div class="px-4 pb-4">
-            <pre class="text-xs text-gray-300 bg-gray-900 rounded p-3 overflow-x-auto">{{ inv.atlas_techniques | tojson(indent=2) }}</pre>
+            {% for tech in inv.atlas_techniques %}
+            <div class="flex items-center space-x-3 py-2">
+                <span class="font-mono text-xs text-ac-gray4">{{ tech.technique_id }}</span>
+                <span class="text-sm text-ac-white">{{ tech.name }}</span>
+                <span class="text-xs text-ac-gray3">Relevance: {{ tech.relevance }}</span>
+            </div>
+            {% if tech.note %}
+            <p class="text-xs text-ac-gray4 ml-4 -mt-1 mb-2">{{ tech.note }}</p>
+            {% endif %}
+            {% endfor %}
         </div>
     </details>
     {% endif %}
 
     <!-- Scoring Breakdown -->
-    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+    <div class="bg-ac-card rounded-ac p-4 border border-ac-border">
         <h2 class="text-lg font-semibold mb-3">Scoring</h2>
-        <dl class="grid grid-cols-3 gap-4 text-sm">
+        <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-                <dt class="text-gray-400">Risk State</dt>
-                <dd>{{ inv.risk_state }}</dd>
+                <dt class="text-ac-gray4 text-xs">Risk State</dt>
+                <dd class="mt-0.5
+                    {% if inv.risk_state == 'critical' %}text-ac-red
+                    {% elif inv.risk_state == 'high' %}text-ac-orange
+                    {% else %}text-ac-white{% endif %}">
+                    {{ inv.risk_state|upper }}
+                </dd>
             </div>
             <div>
-                <dt class="text-gray-400">LLM Calls</dt>
-                <dd>{{ inv.llm_calls }}</dd>
+                <dt class="text-ac-gray4 text-xs">LLM Calls</dt>
+                <dd class="mt-0.5">{{ inv.llm_calls }}</dd>
             </div>
             <div>
-                <dt class="text-gray-400">Total Cost</dt>
-                <dd>${{ "%.4f"|format(inv.total_cost_usd) }}</dd>
+                <dt class="text-ac-gray4 text-xs">Total Cost</dt>
+                <dd class="mt-0.5">${{ "%.4f"|format(inv.total_cost_usd) }}</dd>
+            </div>
+            <div>
+                <dt class="text-ac-gray4 text-xs">Queries Executed</dt>
+                <dd class="mt-0.5">{{ inv.queries_executed }}</dd>
             </div>
         </dl>
     </div>
-
-    <!-- Decision Chain / Timeline -->
-    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-        <h2 class="text-lg font-semibold mb-3">Decision Chain</h2>
-        <div hx-get="/api/investigations/{{ inv.investigation_id }}/timeline"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <span class="text-gray-500 text-sm">Loading timeline...</span>
-        </div>
-    </div>
-
-    <!-- Approval Buttons (if AWAITING_HUMAN) -->
-    {% if inv.state.value == 'awaiting_human' %}
-    <div class="bg-yellow-900/30 rounded-lg p-4 border border-yellow-700">
-        <h2 class="text-lg font-semibold mb-3 text-yellow-300">Action Required</h2>
-        <p class="text-sm text-gray-300 mb-4">This investigation requires human approval before proceeding.</p>
-        <div class="flex space-x-3">
-            <button hx-post="/api/investigations/{{ inv.investigation_id }}/approve"
-                    hx-swap="outerHTML"
-                    hx-confirm="Approve this investigation's recommended actions?"
-                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
-                Approve
-            </button>
-            <button hx-post="/api/investigations/{{ inv.investigation_id }}/reject"
-                    hx-swap="outerHTML"
-                    hx-confirm="Reject this investigation?"
-                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium">
-                Reject
-            </button>
-        </div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

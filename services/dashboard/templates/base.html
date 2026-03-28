@@ -4,26 +4,185 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ALUSKORT Dashboard{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Figtree:wght@400;500;600&family=Fragment+Mono&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ac: {
+                            black: '#050505',
+                            bg: '#0e0e0e',
+                            surface: '#131317',
+                            card: '#18181c',
+                            cardHover: '#1e1e24',
+                            border: '#23232a',
+                            borderLight: '#2a2a33',
+                            red: '#e9311a',
+                            redDark: '#c12310',
+                            redGlow: 'rgba(233, 49, 26, 0.15)',
+                            orange: '#ed6c35',
+                            blue: '#2060df',
+                            blueDark: '#13426c',
+                            green: '#028d5c',
+                            greenDark: '#046a38',
+                            purple: '#635cad',
+                            gray1: '#404245',
+                            gray2: '#5b5b69',
+                            gray3: '#6b6b6e',
+                            gray4: '#808088',
+                            gray5: '#9ba1a5',
+                            gray6: '#ababba',
+                            gray7: '#b9bbc1',
+                            gray8: '#c8d5de',
+                            white: '#edebe8',
+                        }
+                    },
+                    fontFamily: {
+                        montserrat: ['Montserrat', 'sans-serif'],
+                        figtree: ['Figtree', 'sans-serif'],
+                        mono: ['Fragment Mono', 'monospace'],
+                    },
+                    borderRadius: {
+                        ac: '8px',
+                    },
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/ws.js"></script>
     <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: #0e0e0e;
+            color: #edebe8;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
         [hx-indicator] .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline-block; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #131317; }
+        ::-webkit-scrollbar-thumb { background: #23232a; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #404245; }
+
+        /* Active nav link indicator */
+        .nav-link { position: relative; transition: color 0.2s ease; }
+        .nav-link:hover { color: #edebe8; }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 2px;
+            background: #e9311a;
+            transition: width 0.2s ease;
+        }
+        .nav-link:hover::after { width: 100%; }
+        .nav-link.active::after { width: 100%; }
+        .nav-link.active { color: #edebe8; }
+
+        /* Card hover lift */
+        .ac-card {
+            background: #18181c;
+            border: 1px solid #23232a;
+            border-radius: 8px;
+            transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .ac-card:hover {
+            border-color: #2a2a33;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Accent glow on focus */
+        input:focus, select:focus, textarea:focus {
+            border-color: #e9311a !important;
+            box-shadow: 0 0 0 2px rgba(233, 49, 26, 0.15) !important;
+            outline: none !important;
+        }
+
+        /* Button base */
+        .ac-btn {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 500;
+            font-size: 0.8125rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            letter-spacing: 0.01em;
+        }
+        .ac-btn-primary {
+            background: #e9311a;
+            color: #fff;
+        }
+        .ac-btn-primary:hover {
+            background: #c12310;
+            box-shadow: 0 0 20px rgba(233, 49, 26, 0.25);
+        }
+        .ac-btn-ghost {
+            background: transparent;
+            border: 1px solid #23232a;
+            color: #9ba1a5;
+        }
+        .ac-btn-ghost:hover {
+            border-color: #404245;
+            color: #edebe8;
+        }
+
+        /* Badge base */
+        .ac-badge {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 0.6875rem;
+            letter-spacing: 0.04em;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        /* Smooth page transitions */
+        .section-content { transition: opacity 0.15s ease; }
+
+        /* Code/mono elements */
+        code, .font-mono { font-family: 'Fragment Mono', monospace; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen">
+<body class="min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-gray-800 border-b border-gray-700">
+    <nav class="sticky top-0 z-50 border-b border-ac-border" style="background: rgba(14,14,14,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
+            <div class="flex items-center justify-between h-14">
                 <div class="flex items-center space-x-8">
-                    <span class="text-xl font-bold text-blue-400">ALUSKORT</span>
-                    <a href="/overview" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Overview</a>
-                    <a href="/investigations" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Investigations</a>
-                    <a href="/approvals" class="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium">Approvals</a>
+                    <!-- Brand -->
+                    <a href="/" class="flex items-center space-x-2">
+                        <div class="w-6 h-6 rounded bg-ac-red flex items-center justify-center">
+                            <span class="text-white text-xs font-bold font-montserrat">A</span>
+                        </div>
+                        <span class="text-sm font-semibold tracking-wide font-montserrat text-ac-white">ALUSKORT</span>
+                    </a>
+
+                    <!-- Nav links -->
+                    <div class="flex items-center space-x-1">
+                        <a href="/overview" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Overview</a>
+                        <a href="/investigations" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Investigations</a>
+                        <a href="/approvals" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Approvals</a>
+                        <a href="/ctem" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">CTEM</a>
+                        <a href="/cti" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">CTI</a>
+                        <a href="/adversarial-ai" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Adversarial AI</a>
+                        <a href="/connectors" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Connectors</a>
+                        <a href="/settings" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Settings</a>
+                        <a href="/test-harness" class="nav-link text-ac-gray4 px-3 py-2 text-sm font-medium font-montserrat">Test Harness</a>
+                    </div>
                 </div>
-                <div class="text-sm text-gray-400">
+                <div class="text-xs text-ac-gray3 font-figtree">
                     <span id="user-role">{% block user_info %}{% endblock %}</span>
                 </div>
             </div>
@@ -34,5 +193,26 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-ac-border mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
+            <span class="text-xs text-ac-gray3 font-figtree">Applied Computing Technologies</span>
+            <span class="text-xs text-ac-gray2 font-figtree">ALUSKORT SOC Platform</span>
+        </div>
+    </footer>
+
+    <!-- Highlight active nav link -->
+    <script>
+        (function() {
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                if (path === href || (href !== '/' && path.startsWith(href))) {
+                    link.classList.add('active');
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

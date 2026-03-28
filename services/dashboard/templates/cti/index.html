@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %}Threat Intelligence - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold font-montserrat">Threat Intelligence</h1>
+            <p class="text-sm text-ac-gray4 mt-1 font-figtree">IOC feeds, threat indicators, and intelligence management</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span class="text-xs text-ac-gray3 font-figtree">Auto-refresh</span>
+            <div hx-get="/api/cti/stats" hx-trigger="every 60s" hx-swap="none"
+                 class="w-2 h-2 rounded-full bg-ac-green animate-pulse" title="Live updates active"></div>
+        </div>
+    </div>
+
+    <!-- Feed Status Cards -->
+    <section>
+        <h2 class="text-sm font-semibold text-ac-gray5 uppercase tracking-wider mb-4 font-montserrat">Feed Status</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for feed in feeds %}
+            <div class="ac-card p-5">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-ac flex items-center justify-center text-sm font-bold font-montserrat
+                            {% if feed.color == 'blue' %}bg-ac-blue/15 text-ac-blue
+                            {% elif feed.color == 'purple' %}bg-ac-purple/15 text-ac-purple
+                            {% elif feed.color == 'green' %}bg-ac-green/15 text-ac-green
+                            {% elif feed.color == 'orange' %}bg-ac-orange/15 text-ac-orange
+                            {% else %}bg-ac-border text-ac-gray5{% endif %}">
+                            {{ feed.icon }}
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-ac-white font-montserrat">{{ feed.label }}</h3>
+                            <p class="text-xs text-ac-gray3 font-figtree">{{ feed.description }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between mt-4">
+                    <!-- Status indicator -->
+                    {% if feed.status == 'connected' %}
+                    <span class="flex items-center text-xs text-ac-green font-figtree">
+                        <span class="w-2 h-2 rounded-full bg-ac-green mr-1.5"></span> Connected
+                    </span>
+                    {% elif feed.status == 'disabled' %}
+                    <span class="flex items-center text-xs text-ac-gray3 font-figtree">
+                        <span class="w-2 h-2 rounded-full bg-ac-gray2 mr-1.5"></span> Disabled
+                    </span>
+                    {% else %}
+                    <span class="flex items-center text-xs text-ac-gray3 font-figtree">
+                        <span class="w-2 h-2 rounded-full bg-ac-gray1 mr-1.5"></span> Not configured
+                    </span>
+                    {% endif %}
+
+                    <span class="text-xs text-ac-gray4 font-mono">{{ feed.ioc_count }} IOCs</span>
+                </div>
+
+                {% if feed.last_sync %}
+                <p class="text-xs text-ac-gray2 mt-2 font-figtree">Last sync: {{ feed.last_sync }}</p>
+                {% else %}
+                <p class="text-xs text-ac-gray2 mt-2 font-figtree">Last sync: never</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- IOC Summary Stats -->
+    <section>
+        <h2 class="text-sm font-semibold text-ac-gray5 uppercase tracking-wider mb-4 font-montserrat">IOC Summary</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <!-- Total -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-white font-montserrat">{{ stats.total }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">Total IOCs</p>
+            </div>
+            <!-- IPs -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-red font-montserrat">{{ stats.by_type.get('ip', 0) }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">IP Addresses</p>
+            </div>
+            <!-- Domains -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-blue font-montserrat">{{ stats.by_type.get('domain', 0) }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">Domains</p>
+            </div>
+            <!-- File Hashes -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-purple font-montserrat">{{ stats.by_type.get('file_hash', 0) }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">File Hashes</p>
+            </div>
+            <!-- URLs -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-orange font-montserrat">{{ stats.by_type.get('url', 0) }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">URLs</p>
+            </div>
+            <!-- Recent 24h -->
+            <div class="ac-card p-4 text-center">
+                <p class="text-2xl font-bold text-ac-green font-montserrat">{{ stats.recent_24h }}</p>
+                <p class="text-xs text-ac-gray4 mt-1 font-figtree">New (24h)</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- IOC Type Distribution -->
+    <section>
+        <h2 class="text-sm font-semibold text-ac-gray5 uppercase tracking-wider mb-4 font-montserrat">Type Distribution</h2>
+        <div class="ac-card p-5">
+            {% if stats.total > 0 %}
+            <div class="space-y-3">
+                {% set type_colors = {'ip': 'ac-red', 'domain': 'ac-blue', 'file_hash': 'ac-purple', 'url': 'ac-orange', 'email': 'ac-green', 'account': 'ac-gray5'} %}
+                {% for t in ioc_types %}
+                {% set count = stats.by_type.get(t, 0) %}
+                {% set pct = (count / stats.total * 100) if stats.total > 0 else 0 %}
+                <div class="flex items-center space-x-3">
+                    <span class="text-xs text-ac-gray5 w-20 text-right font-figtree">{{ t | replace('_', ' ') | title }}</span>
+                    <div class="flex-1 bg-ac-border rounded-full h-2 overflow-hidden">
+                        <div class="h-full rounded-full bg-{{ type_colors.get(t, 'ac-gray5') }}"
+                             style="width: {{ pct }}%; min-width: {% if count > 0 %}2px{% else %}0{% endif %};"></div>
+                    </div>
+                    <span class="text-xs text-ac-gray4 w-16 font-mono">{{ count }} <span class="text-ac-gray2">({{ '%.0f' % pct }}%)</span></span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center text-ac-gray3 py-6 font-figtree">No IOC data available. Configure a CTI feed via <a href="/connectors" class="text-ac-blue hover:underline">Connectors</a> to begin ingesting threat intelligence.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Search -->
+    <section>
+        <h2 class="text-sm font-semibold text-ac-gray5 uppercase tracking-wider mb-4 font-montserrat">IOC Lookup</h2>
+        <div class="ac-card p-5">
+            <form class="flex items-center space-x-3" id="ioc-search-form">
+                <input type="text" name="search" id="ioc-search-input"
+                       placeholder="Search by IP, domain, hash, URL..."
+                       class="flex-1 bg-ac-surface border border-ac-border rounded-ac px-4 py-2.5 text-sm text-ac-white font-mono placeholder-ac-gray2 focus:outline-none focus:border-ac-red">
+                <select name="ioc_type" id="ioc-type-filter"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-2.5 text-sm text-ac-gray5 focus:outline-none focus:border-ac-red">
+                    <option value="">All Types</option>
+                    {% for t in ioc_types %}
+                    <option value="{{ t }}">{{ t | replace('_', ' ') | title }}</option>
+                    {% endfor %}
+                </select>
+                <select name="source" id="ioc-source-filter"
+                        class="bg-ac-surface border border-ac-border rounded-ac px-3 py-2.5 text-sm text-ac-gray5 focus:outline-none focus:border-ac-red">
+                    <option value="">All Sources</option>
+                    {% for src in ioc_sources %}
+                    <option value="{{ src.id }}">{{ src.label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit"
+                        class="ac-btn ac-btn-primary">
+                    Search
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Recent IOCs Table -->
+    <section>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-ac-gray5 uppercase tracking-wider font-montserrat">Recent IOCs</h2>
+            <span class="text-xs text-ac-gray3 font-figtree">Showing up to 50 most recent indicators</span>
+        </div>
+        <div class="ac-card overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="ioc-table">
+                    <thead>
+                        <tr class="border-b border-ac-border text-left">
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Type</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Value</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Source</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Threat Type</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Confidence</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">First Seen</th>
+                            <th class="px-4 py-3 text-xs font-semibold text-ac-gray4 uppercase tracking-wider font-montserrat">Tags</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ioc-table-body">
+                        {% for ioc in iocs %}
+                        <tr class="border-b border-ac-border/50 hover:bg-ac-cardHover transition-colors">
+                            <!-- Type badge -->
+                            <td class="px-4 py-3">
+                                {% if ioc.ioc_type == 'ip' %}
+                                <span class="ac-badge bg-ac-red/15 text-ac-red">IP</span>
+                                {% elif ioc.ioc_type == 'domain' %}
+                                <span class="ac-badge bg-ac-blue/15 text-ac-blue">DOMAIN</span>
+                                {% elif ioc.ioc_type == 'file_hash' %}
+                                <span class="ac-badge bg-ac-purple/15 text-ac-purple">HASH</span>
+                                {% elif ioc.ioc_type == 'url' %}
+                                <span class="ac-badge bg-ac-orange/15 text-ac-orange">URL</span>
+                                {% elif ioc.ioc_type == 'email' %}
+                                <span class="ac-badge bg-ac-green/15 text-ac-green">EMAIL</span>
+                                {% elif ioc.ioc_type == 'account' %}
+                                <span class="ac-badge bg-ac-gray1/30 text-ac-gray5">ACCOUNT</span>
+                                {% else %}
+                                <span class="ac-badge bg-ac-border text-ac-gray5">{{ ioc.ioc_type | upper }}</span>
+                                {% endif %}
+                            </td>
+                            <!-- Value (mono) -->
+                            <td class="px-4 py-3 font-mono text-ac-gray7 text-xs max-w-xs truncate" title="{{ ioc.value }}">
+                                {{ ioc.value }}
+                            </td>
+                            <!-- Source -->
+                            <td class="px-4 py-3 text-ac-gray5 font-figtree text-xs">{{ ioc.source }}</td>
+                            <!-- Threat Type -->
+                            <td class="px-4 py-3 text-ac-gray5 font-figtree text-xs">{{ ioc.threat_type or '-' }}</td>
+                            <!-- Confidence badge -->
+                            <td class="px-4 py-3">
+                                {% if ioc.confidence is not none %}
+                                    {% if ioc.confidence > 90 %}
+                                    <span class="ac-badge bg-ac-red/15 text-ac-red">{{ ioc.confidence }}%</span>
+                                    {% elif ioc.confidence > 70 %}
+                                    <span class="ac-badge bg-ac-orange/15 text-ac-orange">{{ ioc.confidence }}%</span>
+                                    {% else %}
+                                    <span class="ac-badge bg-ac-gray1/30 text-ac-gray5">{{ ioc.confidence }}%</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-ac-gray2 text-xs">-</span>
+                                {% endif %}
+                            </td>
+                            <!-- First Seen -->
+                            <td class="px-4 py-3 text-ac-gray4 font-figtree text-xs">{{ ioc.first_seen }}</td>
+                            <!-- Tags -->
+                            <td class="px-4 py-3">
+                                {% if ioc.tags %}
+                                    {% set tag_list = ioc.tags if ioc.tags is iterable and ioc.tags is not string else ioc.tags.split(',') if ioc.tags is string else [] %}
+                                    {% for tag in tag_list[:3] %}
+                                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-ac-border text-ac-gray6 mr-1 font-figtree">{{ tag | trim }}</span>
+                                    {% endfor %}
+                                    {% if tag_list | length > 3 %}
+                                    <span class="text-[10px] text-ac-gray3">+{{ tag_list | length - 3 }}</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-ac-gray2 text-xs">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-12 text-center text-ac-gray3 font-figtree">
+                                <p class="text-lg mb-2">No IOCs ingested yet</p>
+                                <p class="text-sm">Configure a CTI feed in <a href="/connectors" class="text-ac-blue hover:underline">Connectors</a> to begin collecting threat intelligence.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- Client-side search / filter -->
+<script>
+    document.getElementById('ioc-search-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const search = document.getElementById('ioc-search-input').value.trim();
+        const iocType = document.getElementById('ioc-type-filter').value;
+        const source = document.getElementById('ioc-source-filter').value;
+
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (iocType) params.set('ioc_type', iocType);
+        if (source) params.set('source', source);
+        params.set('limit', '50');
+
+        try {
+            const resp = await fetch('/api/cti/iocs?' + params.toString());
+            if (!resp.ok) throw new Error('Request failed');
+            const data = await resp.json();
+            renderIOCTable(data.iocs);
+        } catch (ex) {
+            console.error('IOC search failed:', ex);
+        }
+    });
+
+    function renderIOCTable(iocs) {
+        const tbody = document.getElementById('ioc-table-body');
+        if (!iocs || iocs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-4 py-12 text-center text-ac-gray3 font-figtree">
+                        No matching IOCs found.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const typeBadge = {
+            ip:        { cls: 'bg-ac-red/15 text-ac-red', label: 'IP' },
+            domain:    { cls: 'bg-ac-blue/15 text-ac-blue', label: 'DOMAIN' },
+            file_hash: { cls: 'bg-ac-purple/15 text-ac-purple', label: 'HASH' },
+            url:       { cls: 'bg-ac-orange/15 text-ac-orange', label: 'URL' },
+            email:     { cls: 'bg-ac-green/15 text-ac-green', label: 'EMAIL' },
+            account:   { cls: 'bg-ac-gray1/30 text-ac-gray5', label: 'ACCOUNT' },
+        };
+
+        tbody.innerHTML = iocs.map(ioc => {
+            const tb = typeBadge[ioc.ioc_type] || { cls: 'bg-ac-border text-ac-gray5', label: (ioc.ioc_type || '').toUpperCase() };
+
+            let confBadge = '<span class="text-ac-gray2 text-xs">-</span>';
+            if (ioc.confidence != null) {
+                if (ioc.confidence > 90) {
+                    confBadge = `<span class="ac-badge bg-ac-red/15 text-ac-red">${ioc.confidence}%</span>`;
+                } else if (ioc.confidence > 70) {
+                    confBadge = `<span class="ac-badge bg-ac-orange/15 text-ac-orange">${ioc.confidence}%</span>`;
+                } else {
+                    confBadge = `<span class="ac-badge bg-ac-gray1/30 text-ac-gray5">${ioc.confidence}%</span>`;
+                }
+            }
+
+            let tags = '<span class="text-ac-gray2 text-xs">-</span>';
+            if (ioc.tags) {
+                const tagList = Array.isArray(ioc.tags) ? ioc.tags : String(ioc.tags).split(',');
+                const shown = tagList.slice(0, 3).map(t =>
+                    `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-ac-border text-ac-gray6 mr-1 font-figtree">${t.trim()}</span>`
+                ).join('');
+                const extra = tagList.length > 3 ? `<span class="text-[10px] text-ac-gray3">+${tagList.length - 3}</span>` : '';
+                tags = shown + extra;
+            }
+
+            return `
+                <tr class="border-b border-ac-border/50 hover:bg-ac-cardHover transition-colors">
+                    <td class="px-4 py-3"><span class="ac-badge ${tb.cls}">${tb.label}</span></td>
+                    <td class="px-4 py-3 font-mono text-ac-gray7 text-xs max-w-xs truncate" title="${ioc.value || ''}">${ioc.value || ''}</td>
+                    <td class="px-4 py-3 text-ac-gray5 font-figtree text-xs">${ioc.source || ''}</td>
+                    <td class="px-4 py-3 text-ac-gray5 font-figtree text-xs">${ioc.threat_type || '-'}</td>
+                    <td class="px-4 py-3">${confBadge}</td>
+                    <td class="px-4 py-3 text-ac-gray4 font-figtree text-xs">${ioc.first_seen || ''}</td>
+                    <td class="px-4 py-3">${tags}</td>
+                </tr>`;
+        }).join('');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %}Adversarial AI Defense - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- ============ Header ============ -->
+    <div>
+        <h1 class="text-2xl font-bold">Adversarial AI Defense</h1>
+        <p class="text-sm text-ac-gray4 mt-1">MITRE ATLAS framework coverage, detection rules, prompt injection defense, and AI/ML scanning pipeline</p>
+    </div>
+
+    <!-- ============ Section Tabs ============ -->
+    <div class="border-b border-ac-border">
+        <nav class="flex space-x-6" id="section-tabs">
+            <button onclick="showSection('overview')" data-section="overview"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-ac-red text-ac-blue">
+                Overview
+            </button>
+            <button onclick="showSection('atlas')" data-section="atlas"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                ATLAS Techniques
+            </button>
+            <button onclick="showSection('rules')" data-section="rules"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Detection Rules
+            </button>
+            <button onclick="showSection('injection')" data-section="injection"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Prompt Injection
+            </button>
+            <button onclick="showSection('scanning')" data-section="scanning"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Scanning Pipeline
+            </button>
+            <button onclick="showSection('registry')" data-section="registry"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Model Registry
+            </button>
+        </nav>
+    </div>
+
+    <!-- ============ Overview / Defense Status ============ -->
+    <div id="section-overview" class="section-content space-y-6">
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Detection Rules Active -->
+            <div class="ac-card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Detection Rules Active</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-ac-green"></span>
+                </div>
+                <p class="text-3xl font-bold text-ac-white">{{ active_rules_count }}<span class="text-lg text-ac-gray3 font-normal"> / {{ total_rules_count }}</span></p>
+                <p class="text-xs text-ac-gray4 mt-1">ATLAS-mapped detection rules operational</p>
+            </div>
+
+            <!-- Injection Patterns -->
+            <div class="ac-card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Injection Patterns</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-ac-blue"></span>
+                </div>
+                <p class="text-3xl font-bold text-ac-white">{{ total_patterns }}<span class="text-lg text-ac-gray3 font-normal"> patterns</span></p>
+                <p class="text-xs text-ac-gray4 mt-1">Across {{ pattern_categories }} detection categories</p>
+            </div>
+
+            <!-- Scanning Tools -->
+            <div class="ac-card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-ac-gray3 uppercase tracking-wide font-semibold">Scanning Tools</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-ac-purple"></span>
+                </div>
+                <p class="text-3xl font-bold text-ac-white">{{ scanning_tools|length }}<span class="text-lg text-ac-gray3 font-normal"> tools</span></p>
+                <p class="text-xs text-ac-gray4 mt-1">Garak (LLM) + ART (Adversarial ML)</p>
+            </div>
+        </div>
+
+        <!-- ATLAS Technique Quick View -->
+        <div class="ac-card overflow-hidden">
+            <div class="px-5 py-4 border-b border-ac-border">
+                <h2 class="text-md font-semibold text-ac-white">ATLAS Technique Coverage</h2>
+                <p class="text-xs text-ac-gray3 mt-1">{{ atlas_techniques|length }} MITRE ATLAS techniques with active detection mappings</p>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-5 py-2 text-left">ID</th>
+                        <th class="px-5 py-2 text-left">Technique</th>
+                        <th class="px-5 py-2 text-left">Tactic</th>
+                        <th class="px-5 py-2 text-left">Detection Rule</th>
+                        <th class="px-5 py-2 text-left">Severity</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for t in atlas_techniques %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-5 py-3 font-mono text-ac-blue text-xs">{{ t.id }}</td>
+                        <td class="px-5 py-3 text-ac-gray6 font-medium">{{ t.name }}</td>
+                        <td class="px-5 py-3 text-ac-gray4">{{ t.tactic }}</td>
+                        <td class="px-5 py-3 font-mono text-ac-purple text-xs">{{ t.detection_rule_id }}</td>
+                        <td class="px-5 py-3">
+                            {% if t.severity == 'CRITICAL' %}
+                            <span class="ac-badge bg-ac-red/20 text-ac-red">CRITICAL</span>
+                            {% elif t.severity == 'HIGH' %}
+                            <span class="ac-badge bg-ac-orange/20 text-ac-orange">HIGH</span>
+                            {% elif t.severity == 'MEDIUM' %}
+                            <span class="ac-badge bg-ac-orange/15 text-ac-orange">MEDIUM</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-border text-ac-gray6">LOW</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Defense Layers Pipeline -->
+        <div class="ac-card p-5">
+            <h3 class="text-md font-semibold text-ac-white mb-3">Prompt Injection Defense Layers</h3>
+            <div class="flex items-center space-x-2 text-xs text-ac-gray4 flex-wrap gap-y-2">
+                {% for layer in ['Classifier', 'Lossy Summarization', 'XML Evidence Isolation', 'Output Validation'] %}
+                <span class="px-3 py-1.5 rounded bg-ac-blue/15 text-ac-blue border border-ac-blue/30 whitespace-nowrap font-medium">{{ layer }}</span>
+                {% if not loop.last %}
+                <span class="text-ac-gray2">&#8594;</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <p class="text-xs text-ac-gray3 mt-3">
+                All LLM interactions pass through four defense layers. The classifier catches known injection patterns,
+                lossy summarization strips adversarial formatting, XML isolation prevents evidence contamination,
+                and output validation blocks leaked system prompts and unauthorized tool calls.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============ ATLAS Techniques Detail ============ -->
+    <div id="section-atlas" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">MITRE ATLAS Technique Coverage</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Adversarial Threat Landscape for AI Systems (ATLAS) technique mappings for platform defenses</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for t in atlas_techniques %}
+            <div class="ac-card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <span class="font-mono text-ac-blue text-sm font-semibold">{{ t.id }}</span>
+                        {% if t.severity == 'CRITICAL' %}
+                        <span class="ac-badge bg-ac-red/20 text-ac-red">CRITICAL</span>
+                        {% elif t.severity == 'HIGH' %}
+                        <span class="ac-badge bg-ac-orange/20 text-ac-orange">HIGH</span>
+                        {% elif t.severity == 'MEDIUM' %}
+                        <span class="ac-badge bg-ac-orange/15 text-ac-orange">MEDIUM</span>
+                        {% else %}
+                        <span class="ac-badge bg-ac-border text-ac-gray6">LOW</span>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs text-ac-gray3 bg-ac-border px-2 py-0.5 rounded">{{ t.tactic }}</span>
+                </div>
+                <h3 class="text-md font-semibold text-ac-white mb-2">{{ t.name }}</h3>
+                <p class="text-sm text-ac-gray4 mb-3">{{ t.description }}</p>
+                <div class="flex items-center space-x-2 text-xs">
+                    <span class="text-ac-gray3">Detection:</span>
+                    <span class="font-mono text-ac-purple bg-ac-purple/10 px-2 py-0.5 rounded">{{ t.detection_rule_id }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ============ Detection Rules ============ -->
+    <div id="section-rules" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">ATLAS Detection Rules</h2>
+            <p class="text-sm text-ac-gray4 mt-1">{{ active_rules_count }} active / {{ total_rules_count }} total detection rules mapped to ATLAS techniques</p>
+        </div>
+
+        <div class="space-y-3">
+            {% for rule in detection_rules %}
+            <div class="ac-card overflow-hidden">
+                <div class="p-5 cursor-pointer" onclick="this.parentElement.querySelector('.rule-detail').classList.toggle('hidden')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <span class="font-mono text-ac-blue text-sm font-semibold whitespace-nowrap">{{ rule.rule_id }}</span>
+                            <h3 class="text-sm font-medium text-ac-white">{{ rule.name }}</h3>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="font-mono text-xs text-ac-gray3">{{ rule.atlas_technique }}</span>
+                            {% if rule.status == 'active' %}
+                            <span class="ac-badge bg-ac-green/20 text-ac-green">ACTIVE</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-gray1/30 text-ac-gray4">DISABLED</span>
+                            {% endif %}
+                            <svg class="w-4 h-4 text-ac-gray3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="rule-detail hidden border-t border-ac-border bg-ac-surface/80 p-5 space-y-3">
+                    <p class="text-sm text-ac-gray4">{{ rule.description }}</p>
+                    <div class="flex items-start space-x-6">
+                        <div>
+                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">Threshold</span>
+                            <p class="text-sm text-ac-orange font-mono mt-1">{{ rule.threshold }}</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">ATLAS Technique</span>
+                            <p class="text-sm text-ac-blue font-mono mt-1">{{ rule.atlas_technique }}</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-ac-gray3 uppercase tracking-wide">Status</span>
+                            <div class="mt-1">
+                                {% if rule.status == 'active' %}
+                                <span class="inline-flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-ac-green"></span>
+                                    <span class="text-sm text-ac-green">Active</span>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-ac-gray3"></span>
+                                    <span class="text-sm text-ac-gray4">Disabled</span>
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ============ Prompt Injection Defense ============ -->
+    <div id="section-injection" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">Prompt Injection Defense</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Layered defense pipeline protecting all LLM interactions from adversarial prompt manipulation</p>
+        </div>
+
+        <!-- Defense Pipeline -->
+        <div class="ac-card p-5">
+            <h3 class="text-md font-semibold text-ac-white mb-4">Defense Pipeline</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-ac-surface border border-ac-blue/30 rounded-ac p-4 text-center">
+                    <div class="w-10 h-10 rounded-full bg-ac-blue/20 flex items-center justify-center mx-auto mb-3">
+                        <span class="text-ac-blue font-bold text-lg">1</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-ac-blue mb-1">Classifier</h4>
+                    <p class="text-xs text-ac-gray4">ML classifier scores inputs for injection probability across {{ pattern_categories }} pattern categories</p>
+                </div>
+                <div class="bg-ac-surface border border-ac-purple/30 rounded-ac p-4 text-center">
+                    <div class="w-10 h-10 rounded-full bg-ac-purple/20 flex items-center justify-center mx-auto mb-3">
+                        <span class="text-ac-purple font-bold text-lg">2</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-ac-purple mb-1">Lossy Summarization</h4>
+                    <p class="text-xs text-ac-gray4">Strips adversarial formatting, special characters, and structural manipulation from inputs</p>
+                </div>
+                <div class="bg-ac-surface border border-ac-green/30 rounded-ac p-4 text-center">
+                    <div class="w-10 h-10 rounded-full bg-ac-green/20 flex items-center justify-center mx-auto mb-3">
+                        <span class="text-ac-green font-bold text-lg">3</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-ac-green mb-1">XML Evidence Isolation</h4>
+                    <p class="text-xs text-ac-gray4">Isolates evidence data in XML-tagged blocks preventing cross-contamination of system instructions</p>
+                </div>
+                <div class="bg-ac-surface border border-ac-orange/30 rounded-ac p-4 text-center">
+                    <div class="w-10 h-10 rounded-full bg-ac-orange/20 flex items-center justify-center mx-auto mb-3">
+                        <span class="text-ac-orange font-bold text-lg">4</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-ac-orange mb-1">Output Validation</h4>
+                    <p class="text-xs text-ac-gray4">Validates outputs for leaked system prompts, unauthorized tool calls, and policy violations</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pattern Categories -->
+        <div class="ac-card overflow-hidden">
+            <div class="px-5 py-4 border-b border-ac-border">
+                <h3 class="text-md font-semibold text-ac-white">Detection Pattern Categories</h3>
+                <p class="text-xs text-ac-gray3 mt-1">{{ total_patterns }} patterns across {{ pattern_categories }} categories</p>
+            </div>
+            <div class="divide-y divide-gray-700/50">
+                {% for p in injection_patterns %}
+                <div class="px-5 py-4 hover:bg-ac-cardHover/30">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-mono text-ac-blue text-sm">{{ p.category }}</span>
+                            {% if p.status == 'active' %}
+                            <span class="ac-badge bg-ac-green/20 text-ac-green">ACTIVE</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-gray1/30 text-ac-gray4">DISABLED</span>
+                            {% endif %}
+                        </div>
+                        <span class="text-sm font-bold text-ac-white">{{ p.count }} patterns</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        {% for ex in p.examples %}
+                        <span class="text-xs bg-ac-border text-ac-gray5 px-2 py-0.5 rounded font-mono">{{ ex }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ AI/ML Scanning Pipeline ============ -->
+    <div id="section-scanning" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">AI/ML Scanning Pipeline</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Continuous adversarial testing via Garak (LLM probes) and ART (adversarial robustness)</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for tool in scanning_tools %}
+            <div class="ac-card p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-ac flex items-center justify-center
+                            {% if tool.tool == 'Garak' %}bg-ac-red/15{% else %}bg-ac-purple/15{% endif %}">
+                            <span class="font-bold text-sm
+                                {% if tool.tool == 'Garak' %}text-ac-red{% else %}text-ac-purple{% endif %}">
+                                {% if tool.tool == 'Garak' %}G{% else %}A{% endif %}
+                            </span>
+                        </div>
+                        <div>
+                            <h3 class="text-md font-semibold text-ac-white">{{ tool.tool }}</h3>
+                            <p class="text-xs text-ac-gray3">{{ tool.description }}</p>
+                        </div>
+                    </div>
+                    {% if tool.status == 'configured' %}
+                    <span class="ac-badge bg-ac-green/20 text-ac-green">CONFIGURED</span>
+                    {% elif tool.status == 'running' %}
+                    <span class="ac-badge bg-ac-blue/20 text-ac-blue">RUNNING</span>
+                    {% else %}
+                    <span class="ac-badge bg-ac-gray1/30 text-ac-gray4">PENDING</span>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <span class="text-xs text-ac-gray3 uppercase tracking-wide">
+                            {% if tool.tool == 'Garak' %}Probe Types{% else %}Attack Types{% endif %}
+                        </span>
+                        <div class="flex flex-wrap gap-2 mt-1.5">
+                            {% for probe in tool.probe_types %}
+                            <span class="text-xs px-2 py-1 rounded border
+                                {% if tool.tool == 'Garak' %}bg-ac-red/10 border-ac-red/20 text-ac-red
+                                {% else %}bg-ac-purple/10 border-ac-purple/20 text-ac-purple{% endif %}
+                                font-mono">{{ probe }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-3 border-t border-ac-border">
+                        <div>
+                            <span class="text-xs text-ac-gray3">Last Scan</span>
+                            <p class="text-sm text-ac-gray5">{{ tool.last_scan }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-ac-gray3">Findings</span>
+                            <p class="text-sm font-bold {% if tool.findings_count > 0 %}text-ac-orange{% else %}text-ac-gray5{% endif %}">
+                                {{ tool.findings_count }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Scanning Pipeline Flow -->
+        <div class="ac-card p-5">
+            <h3 class="text-md font-semibold text-ac-white mb-3">CTEM Integration Pipeline</h3>
+            <div class="text-sm text-ac-gray4 space-y-2">
+                <p><span class="text-ac-gray6 font-medium">Garak:</span>
+                    LLM Probes &#8594; <span class="font-mono text-ac-blue">ctem.raw.garak</span>
+                    &#8594; CTEM Normaliser &#8594; <span class="font-mono text-ac-blue">ctem.normalized</span>
+                    &#8594; ATLAS Mapper</p>
+                <p><span class="text-ac-gray6 font-medium">ART:</span>
+                    Robustness Tests &#8594; <span class="font-mono text-ac-blue">ctem.raw.art</span>
+                    &#8594; CTEM Normaliser &#8594; <span class="font-mono text-ac-blue">ctem.normalized</span>
+                    &#8594; ATLAS Mapper</p>
+            </div>
+            <p class="text-xs text-ac-gray3 mt-3">
+                Both tools publish findings to Kafka topics. The CTEM normaliser assigns consequence-weighted severity
+                using the Purdue model zone mappings. The ATLAS Mapper correlates findings to MITRE ATLAS techniques.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============ Model Registry ============ -->
+    <div id="section-registry" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">Model Registry</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Registered AI/ML models tracked for adversarial defense coverage</p>
+        </div>
+
+        {% if models %}
+        <div class="ac-card overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-5 py-3 text-left">Model ID</th>
+                        <th class="px-5 py-3 text-left">Name</th>
+                        <th class="px-5 py-3 text-left">Type</th>
+                        <th class="px-5 py-3 text-left">Version</th>
+                        <th class="px-5 py-3 text-left">Status</th>
+                        <th class="px-5 py-3 text-left">Created</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for model in models %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-5 py-3 font-mono text-ac-blue text-xs">{{ model.get('model_id', 'N/A') }}</td>
+                        <td class="px-5 py-3 text-ac-gray6">{{ model.get('name', 'N/A') }}</td>
+                        <td class="px-5 py-3 text-ac-gray4">{{ model.get('model_type', 'N/A') }}</td>
+                        <td class="px-5 py-3 font-mono text-ac-gray4 text-xs">{{ model.get('version', 'N/A') }}</td>
+                        <td class="px-5 py-3">
+                            {% set status = model.get('status', 'unknown') %}
+                            {% if status == 'active' or status == 'deployed' %}
+                            <span class="ac-badge bg-ac-green/20 text-ac-green">{{ status|upper }}</span>
+                            {% elif status == 'training' %}
+                            <span class="ac-badge bg-ac-blue/20 text-ac-blue">TRAINING</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-border text-ac-gray4">{{ status|upper }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3 text-ac-gray3 text-xs">{{ model.get('created_at', 'N/A') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="ac-card p-8 text-center">
+            <div class="w-16 h-16 rounded-full bg-ac-border flex items-center justify-center mx-auto mb-4">
+                <span class="text-ac-gray3 text-2xl">?</span>
+            </div>
+            <h3 class="text-md font-semibold text-ac-gray5 mb-2">No Models Registered</h3>
+            <p class="text-sm text-ac-gray3 max-w-md mx-auto">
+                The model registry is empty. Models will appear here once they are registered via the
+                <span class="font-mono text-ac-blue">model_registry</span> database table or the model registration API.
+            </p>
+            <p class="text-xs text-ac-gray2 mt-3">
+                Ensure the database is connected and migrations have been run from Settings.
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Activity Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="ac-card p-5">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide">Registered Models</span>
+                <p class="text-2xl font-bold mt-2 {% if model_count > 0 %}text-ac-blue{% else %}text-ac-gray3{% endif %}">{{ model_count }}</p>
+            </div>
+            <div class="ac-card p-5">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide">Inference Logs</span>
+                <p class="text-2xl font-bold mt-2 {% if inference_count > 0 %}text-ac-blue{% else %}text-ac-gray3{% endif %}">{{ inference_count }}</p>
+            </div>
+            <div class="ac-card p-5">
+                <span class="text-xs text-ac-gray3 uppercase tracking-wide">Training Audit Records</span>
+                <p class="text-2xl font-bold mt-2 {% if audit_count > 0 %}text-ac-blue{% else %}text-ac-gray3{% endif %}">{{ audit_count }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showSection(id) {
+        document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById('section-' + id).classList.remove('hidden');
+        document.querySelectorAll('.section-tab').forEach(tab => {
+            const isActive = tab.dataset.section === id;
+            tab.classList.toggle('border-ac-red', isActive);
+            tab.classList.toggle('text-ac-blue', isActive);
+            tab.classList.toggle('border-transparent', !isActive);
+            tab.classList.toggle('text-ac-gray4', !isActive);
+        });
+    }
+</script>
+{% endblock %}

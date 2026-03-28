@@ -32,9 +32,9 @@ async def _fetch_investigations(
 
     query = """
         SELECT investigation_id, alert_id, tenant_id, state,
-               graphstate_json->>'severity' AS severity,
+               graph_state->>'severity' AS severity,
                updated_at
-        FROM investigations
+        FROM investigation_state
         WHERE 1=1
     """
     params: list[Any] = []
@@ -45,7 +45,7 @@ async def _fetch_investigations(
         params.append(state)
         idx += 1
     if severity:
-        query += f" AND graphstate_json->>'severity' = ${idx}"
+        query += f" AND graph_state->>'severity' = ${idx}"
         params.append(severity)
         idx += 1
     if tenant_id:

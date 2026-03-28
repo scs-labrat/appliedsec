@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+{% block title %}System Settings - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+    <div>
+        <h1 class="text-2xl font-bold">System Settings</h1>
+        <p class="text-sm text-ac-gray4 mt-1">Infrastructure health, asset zones, threat model, SLA policies, and data pipeline</p>
+    </div>
+
+    <!-- Section Tabs -->
+    <div class="border-b border-ac-border">
+        <nav class="flex space-x-6" id="section-tabs">
+            <button onclick="showSection('infra')" data-section="infra"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-ac-red text-ac-blue">
+                Infrastructure
+            </button>
+            <button onclick="showSection('zones')" data-section="zones"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Asset Zones
+            </button>
+            <button onclick="showSection('threat')" data-section="threat"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Threat Model
+            </button>
+            <button onclick="showSection('sla')" data-section="sla"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                SLA Policies
+            </button>
+            <button onclick="showSection('pipeline')" data-section="pipeline"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                Data Pipeline
+            </button>
+            <button onclick="showSection('llm')" data-section="llm"
+                    class="section-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                LLM Config
+            </button>
+        </nav>
+    </div>
+
+    <!-- ============ Infrastructure Health ============ -->
+    <div id="section-infra" class="section-content space-y-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-lg font-semibold">Infrastructure Services</h2>
+            <button hx-get="/api/settings/health" hx-target="#infra-status" hx-swap="innerHTML"
+                    hx-indicator="#refresh-spinner"
+                    class="text-sm text-ac-blue hover:text-ac-white flex items-center space-x-1">
+                <span>Refresh</span>
+                <span class="htmx-indicator" id="refresh-spinner">...</span>
+            </button>
+        </div>
+
+        <!-- Status Summary Bar -->
+        {% set healthy_count = infra_services|selectattr('status', 'equalto', 'healthy')|list|length %}
+        {% set total_count = infra_services|length %}
+        {% set unhealthy = total_count - healthy_count %}
+        <div class="flex items-center space-x-4 bg-ac-card rounded-ac border border-ac-border p-4">
+            <div class="flex items-center space-x-2">
+                {% if unhealthy == 0 %}
+                <span class="w-3 h-3 rounded-full bg-ac-green"></span>
+                <span class="text-ac-green font-medium">All systems operational</span>
+                {% elif healthy_count > 0 %}
+                <span class="w-3 h-3 rounded-full bg-ac-orange"></span>
+                <span class="text-ac-orange font-medium">{{ unhealthy }} service{{ 's' if unhealthy != 1 else '' }} need{{ '' if unhealthy != 1 else 's' }} attention</span>
+                {% else %}
+                <span class="w-3 h-3 rounded-full bg-ac-red"></span>
+                <span class="text-ac-red font-medium">No services connected</span>
+                {% endif %}
+            </div>
+            <span class="text-ac-gray3 text-sm">{{ healthy_count }}/{{ total_count }} healthy</span>
+
+            {% if unhealthy > 0 %}
+            <button onclick="document.querySelectorAll('.remediation-panel').forEach(p => { if(p.closest('.svc-card').querySelector('.svc-status').dataset.status !== 'healthy') p.classList.remove('hidden') })"
+                    class="ml-auto text-xs bg-ac-orange hover:bg-ac-orange text-white px-3 py-1 rounded">
+                Show All Fixes
+            </button>
+            {% endif %}
+        </div>
+
+        <div id="infra-status" class="space-y-4">
+            {% for svc in infra_services %}
+            <div class="svc-card bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+                <div class="p-5">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <!-- Status indicator -->
+                                <span class="svc-status" data-status="{{ svc.status }}">
+                                    {% if svc.status == 'healthy' %}
+                                    <span class="w-2.5 h-2.5 rounded-full bg-ac-green inline-block"></span>
+                                    {% elif svc.status == 'disconnected' or svc.status == 'unreachable' %}
+                                    <span class="w-2.5 h-2.5 rounded-full bg-ac-red inline-block"></span>
+                                    {% elif svc.status == 'unhealthy' or svc.status == 'error' %}
+                                    <span class="w-2.5 h-2.5 rounded-full bg-ac-orange inline-block"></span>
+                                    {% else %}
+                                    <span class="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block"></span>
+                                    {% endif %}
+                                </span>
+
+                                <h3 class="text-md font-semibold text-ac-white">{{ svc.label }}</h3>
+
+                                <span class="px-2 py-0.5 rounded text-xs
+                                    {% if svc.status == 'healthy' %}bg-ac-green/20 text-ac-green
+                                    {% elif svc.status in ('disconnected', 'unreachable') %}bg-ac-red/20 text-ac-red
+                                    {% elif svc.status in ('unhealthy', 'error') %}bg-ac-orange/15 text-ac-orange
+                                    {% else %}bg-ac-border text-ac-gray4{% endif %}">
+                                    {{ svc.status|upper }}
+                                </span>
+                            </div>
+
+                            <p class="text-sm text-ac-gray4">{{ svc.description }}</p>
+
+                            <div class="text-xs text-ac-gray3 mt-2 space-y-1">
+                                <p>
+                                    <span class="font-mono text-ac-gray4">{{ svc.env_var }}</span>
+                                    = <span class="text-ac-gray6">{{ svc.env_value }}</span>
+                                </p>
+                                {% if svc.detail %}
+                                <p class="{% if svc.status == 'healthy' %}text-green-500{% else %}text-yellow-500{% endif %}">
+                                    {{ svc.detail }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="flex flex-col space-y-2 ml-4">
+                            {% if svc.status != 'healthy' %}
+                            <button onclick="this.closest('.svc-card').querySelector('.remediation-panel').classList.toggle('hidden')"
+                                    class="bg-ac-orange hover:bg-ac-orange text-white px-3 py-1.5 rounded text-xs font-medium">
+                                Fix
+                            </button>
+                            {% if svc.id in ('postgres', 'redis') %}
+                            <button onclick="reconnectService('{{ svc.id }}', this)"
+                                    class="bg-ac-blue hover:bg-ac-blueDark text-white px-3 py-1.5 rounded text-xs font-medium">
+                                Reconnect
+                            </button>
+                            {% endif %}
+                            {% else %}
+                            <button onclick="this.closest('.svc-card').querySelector('.remediation-panel').classList.toggle('hidden')"
+                                    class="bg-ac-border hover:bg-ac-cardHover text-ac-gray6 px-3 py-1.5 rounded text-xs font-medium">
+                                Details
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remediation panel (hidden by default) -->
+                <div class="remediation-panel hidden border-t border-ac-border bg-ac-surface/80 p-5">
+                    <p class="text-sm text-ac-gray6 mb-3">{{ svc.docs }}</p>
+
+                    {% if svc.status != 'healthy' %}
+                    <h4 class="text-xs font-semibold text-ac-orange uppercase tracking-wide mb-2">Remediation Steps</h4>
+                    <ol class="list-decimal list-inside space-y-1.5 text-sm text-ac-gray4">
+                        {% for step in svc.remediation %}
+                        <li>
+                            {% if 'docker' in step or 'curl' in step or 'python' in step or 'rpk' in step %}
+                            <code class="bg-ac-border px-1.5 py-0.5 rounded text-xs text-ac-green font-mono">{{ step }}</code>
+                            {% else %}
+                            {{ step }}
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    {% endif %}
+
+                    {% if svc.id == 'postgres' and svc.status == 'healthy' %}
+                    <div class="mt-3">
+                        <button onclick="runMigrations(this)"
+                                class="bg-ac-purple hover:bg-ac-purple text-white px-3 py-1.5 rounded text-xs font-medium">
+                            Run Migrations
+                        </button>
+                        <span class="migration-result text-xs text-ac-gray3 ml-2"></span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if db_stats %}
+        <h3 class="text-md font-semibold mt-6">Database Table Counts</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {% for label, count in db_stats.items() %}
+            <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+                <p class="text-sm text-ac-gray4">{{ label }}</p>
+                <p class="text-2xl font-bold {% if count == 'N/A' %}text-ac-orange{% elif count == 0 %}text-ac-gray3{% else %}text-ac-blue{% endif %}">
+                    {{ count }}
+                </p>
+                {% if count == 0 %}
+                <p class="text-xs text-ac-gray2 mt-1">Empty — needs data or migration</p>
+                {% elif count == 'N/A' %}
+                <p class="text-xs text-yellow-600 mt-1">Table may not exist — run migrations</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ============ Asset Zones ============ -->
+    <div id="section-zones" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">Asset Zone Configuration</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Purdue model zones map assets to physical consequence classes for risk-weighted scoring</p>
+        </div>
+
+        {% for group in zone_groups %}
+        <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+            <div class="px-4 py-3 border-b border-ac-border">
+                <h3 class="text-sm font-semibold text-ac-gray6">{{ group.group }}</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase">
+                        <th class="px-4 py-2 text-left">Zone</th>
+                        <th class="px-4 py-2 text-left">Consequence Class</th>
+                        <th class="px-4 py-2 text-left">Base Severity</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for z in group.zones %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-4 py-2 font-mono text-ac-gray6">{{ z.zone }}</td>
+                        <td class="px-4 py-2">
+                            {% if z.consequence == 'safety_life' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-red/20 text-ac-red">safety_life</span>
+                            {% elif z.consequence == 'equipment' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-orange/20 text-ac-orange">equipment</span>
+                            {% elif z.consequence == 'downtime' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-orange/15 text-ac-orange">downtime</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">data_loss</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2">
+                            {% if z.severity == 'CRITICAL' %}
+                            <span class="text-ac-red font-semibold">CRITICAL</span>
+                            {% elif z.severity == 'HIGH' %}
+                            <span class="text-ac-orange font-semibold">HIGH</span>
+                            {% elif z.severity == 'MEDIUM' %}
+                            <span class="text-ac-orange">MEDIUM</span>
+                            {% else %}
+                            <span class="text-ac-gray4">LOW</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+
+        <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-2">Neo4j Asset Graph</h3>
+            <p class="text-sm text-ac-gray4">
+                Assets, zones, models, and findings are stored in Neo4j as a property graph.
+                Relationships: <span class="font-mono text-ac-gray6">Asset -[:RESIDES_IN]-> Zone</span>,
+                <span class="font-mono text-ac-gray6">Finding -[:AFFECTS]-> Asset</span>,
+                <span class="font-mono text-ac-gray6">Model -[:DEPLOYS_TO]-> Asset</span>.
+                When Neo4j is unavailable, the system falls back to the static zone-consequence mapping above.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============ Threat Model ============ -->
+    <div id="section-threat" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">Consequence-Weighted Severity Matrix</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Maps exploitability x consequence to final severity. Used by all CTEM normalisers.</p>
+        </div>
+
+        <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-4 py-3 text-left"></th>
+                        <th class="px-4 py-3 text-center">safety_life</th>
+                        <th class="px-4 py-3 text-center">equipment</th>
+                        <th class="px-4 py-3 text-center">downtime</th>
+                        <th class="px-4 py-3 text-center">data_loss</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for level in ['high', 'medium', 'low'] %}
+                    <tr>
+                        <td class="px-4 py-3 font-semibold text-ac-gray6">{{ level|title }} Exploitability</td>
+                        {% for cons in ['safety_life', 'equipment', 'downtime', 'data_loss'] %}
+                        {% set match = severity_matrix|selectattr('exploitability', 'equalto', level)|selectattr('consequence', 'equalto', cons)|first %}
+                        <td class="px-4 py-3 text-center">
+                            {% if match.severity == 'CRITICAL' %}
+                            <span class="px-2 py-1 rounded text-xs font-bold bg-ac-red/20 text-ac-red">CRITICAL</span>
+                            {% elif match.severity == 'HIGH' %}
+                            <span class="px-2 py-1 rounded text-xs font-bold bg-ac-orange/20 text-ac-orange">HIGH</span>
+                            {% elif match.severity == 'MEDIUM' %}
+                            <span class="px-2 py-1 rounded text-xs font-bold bg-ac-orange/15 text-ac-orange">MEDIUM</span>
+                            {% else %}
+                            <span class="px-2 py-1 rounded text-xs font-bold bg-ac-border text-ac-gray6">LOW</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+                <h3 class="text-sm font-semibold text-ac-gray6 mb-3">Consequence Weights (CTEM Score)</h3>
+                <p class="text-xs text-ac-gray3 mb-3">CTEM Score = exploitability_score x weight x 10</p>
+                <div class="space-y-2">
+                    {% for cons, weight in [('safety_life', 1.0), ('equipment', 0.8), ('downtime', 0.5), ('data_loss', 0.3)] %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-ac-gray4">{{ cons }}</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-32 bg-ac-border rounded-full h-2">
+                                <div class="h-2 rounded-full {% if weight >= 0.9 %}bg-ac-red{% elif weight >= 0.7 %}bg-orange-500{% elif weight >= 0.4 %}bg-ac-orange{% else %}bg-gray-500{% endif %}"
+                                     style="width: {{ weight * 100 }}%"></div>
+                            </div>
+                            <span class="text-sm font-mono text-ac-gray6">{{ weight }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+                <h3 class="text-sm font-semibold text-ac-gray6 mb-3">CTEM Tool Pipeline</h3>
+                <p class="text-xs text-ac-gray3 mb-3">Exposure discovery tools feed into normalisation</p>
+                <div class="space-y-2 text-sm">
+                    {% for tool in [('Wiz', 'CSPM cloud misconfigurations'), ('Snyk', 'SCA dependency vulnerabilities'), ('Garak', 'LLM prompt injection & jailbreak'), ('ART', 'Adversarial ML robustness testing'), ('Burp', 'DAST web application scanning')] %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-ac-gray6 font-medium">{{ tool[0] }}</span>
+                        <span class="text-ac-gray3 text-xs">{{ tool[1] }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-2">ATLAS Adversarial ML Detection</h3>
+            <p class="text-sm text-ac-gray4">
+                ATLAS techniques from MITRE are mapped to detections. Trust levels (trusted/untrusted) determine
+                confidence floors and whether human review is forced. Safety-relevant detections trigger
+                mandatory analyst approval before response actions execute.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============ SLA Policies ============ -->
+    <div id="section-sla" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">SLA Remediation Deadlines</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Maximum time to remediate CTEM exposures by severity</p>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% for sla in sla_policies %}
+            <div class="bg-ac-card rounded-ac border border-ac-border p-5 text-center">
+                <div class="mb-2">
+                    {% if sla.severity == 'CRITICAL' %}
+                    <span class="px-3 py-1 rounded text-sm font-bold bg-ac-red/20 text-ac-red">{{ sla.severity }}</span>
+                    {% elif sla.severity == 'HIGH' %}
+                    <span class="px-3 py-1 rounded text-sm font-bold bg-ac-orange/20 text-ac-orange">{{ sla.severity }}</span>
+                    {% elif sla.severity == 'MEDIUM' %}
+                    <span class="px-3 py-1 rounded text-sm font-bold bg-ac-orange/15 text-ac-orange">{{ sla.severity }}</span>
+                    {% else %}
+                    <span class="px-3 py-1 rounded text-sm font-bold bg-ac-border text-ac-gray6">{{ sla.severity }}</span>
+                    {% endif %}
+                </div>
+                <p class="text-2xl font-bold text-ac-white mt-3">{{ sla.display }}</p>
+                <p class="text-xs text-ac-gray3 mt-1">{{ sla.hours }} hours</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-2">Investigation Pipeline</h3>
+            <div class="flex items-center space-x-2 text-xs text-ac-gray4 flex-wrap gap-y-2">
+                {% for step in ['RECEIVED', 'PARSING (IOC)', 'FP Check', 'ENRICHING', 'REASONING (LLM)', 'AWAITING HUMAN', 'RESPONDING', 'CLOSED'] %}
+                <span class="px-2 py-1 rounded bg-ac-border text-ac-gray6 whitespace-nowrap">{{ step }}</span>
+                {% if not loop.last %}
+                <span class="text-ac-gray2">&#8594;</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <p class="text-xs text-ac-gray3 mt-3">
+                Parallel enrichment: Context Enricher + CTEM Correlator + ATLAS Mapper run concurrently.
+                Trust constraint: all-untrusted ATLAS detections force human review.
+            </p>
+        </div>
+    </div>
+
+    <!-- ============ Data Pipeline ============ -->
+    <div id="section-pipeline" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">Kafka Topics & Data Pipeline</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Event-driven message topics connecting all services</p>
+        </div>
+
+        {% for cat_id, cat_label in [('siem', 'SIEM / Alert Ingestion'), ('ctem', 'CTEM / Exposure Management'), ('orchestrator', 'Orchestrator'), ('audit', 'Audit')] %}
+        <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+            <div class="px-4 py-3 border-b border-ac-border">
+                <h3 class="text-sm font-semibold text-ac-gray6">{{ cat_label }}</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase">
+                        <th class="px-4 py-2 text-left">Topic</th>
+                        <th class="px-4 py-2 text-left">Description</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for t in kafka_topics %}
+                    {% if t.category == cat_id %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-4 py-2 font-mono text-ac-blue">{{ t.topic }}</td>
+                        <td class="px-4 py-2 text-ac-gray4">{{ t.description }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+
+        <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-2">Pipeline Flow</h3>
+            <div class="text-sm text-ac-gray4 space-y-2">
+                <p><span class="text-ac-gray6 font-medium">SIEM:</span>
+                    Connector &#8594; <span class="font-mono text-ac-blue">alerts.raw</span>
+                    &#8594; Entity Parser &#8594; <span class="font-mono text-ac-blue">alerts.normalized</span>
+                    &#8594; Orchestrator &#8594; <span class="font-mono text-ac-blue">investigations.completed</span></p>
+                <p><span class="text-ac-gray6 font-medium">CTEM:</span>
+                    Scanner &#8594; <span class="font-mono text-ac-blue">ctem.raw.*</span>
+                    &#8594; CTEM Normaliser &#8594; <span class="font-mono text-ac-blue">ctem.normalized</span>
+                    &#8594; Postgres upsert</p>
+                <p><span class="text-ac-gray6 font-medium">CTI:</span>
+                    Feed &#8594; Redis IOC cache &#8594; <span class="font-mono text-ac-blue">threat_intel_iocs</span> table
+                    &#8594; IOC Extractor enrichment</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ LLM Config ============ -->
+    <div id="section-llm" class="section-content hidden space-y-6">
+        <div>
+            <h2 class="text-lg font-semibold">LLM Configuration</h2>
+            <p class="text-sm text-ac-gray4 mt-1">Model tiers, spend controls, gateway settings, and task routing</p>
+        </div>
+
+        <!-- Spend Guard -->
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-4">Spend Guard</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <p class="text-xs text-ac-gray3 uppercase tracking-wide">Monthly Hard Cap</p>
+                    <p class="text-2xl font-bold text-ac-red mt-1">${{ llm_config.spend_guard.monthly_hard_cap }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-ac-gray3 uppercase tracking-wide">Soft Alert</p>
+                    <p class="text-2xl font-bold text-ac-orange mt-1">${{ llm_config.spend_guard.monthly_soft_alert }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-ac-gray3 uppercase tracking-wide">Current Spend</p>
+                    <p class="text-2xl font-bold text-ac-blue mt-1">
+                        {% if llm_stats.get('total_spend') is not none %}
+                        ${{ "%.2f"|format(llm_stats.total_spend) }}
+                        {% else %}
+                        <span class="text-ac-gray3">N/A</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-xs text-ac-gray3 uppercase tracking-wide">Total API Calls</p>
+                    <p class="text-2xl font-bold text-ac-green mt-1">
+                        {% if llm_stats.get('total_calls') is not none %}
+                        {{ llm_stats.total_calls }}
+                        {% else %}
+                        <span class="text-ac-gray3">N/A</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Tiers -->
+        <h3 class="text-md font-semibold">Model Tiers</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for tier in llm_config.tiers %}
+            <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-semibold text-ac-white">{{ tier.name }}</h4>
+                    <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">{{ tier.latency_slo }}</span>
+                </div>
+
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Model</span>
+                        <span class="font-mono text-ac-blue text-xs">{{ tier.model }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Provider</span>
+                        <span class="text-ac-gray6">{{ tier.provider }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Max Context</span>
+                        <span class="text-ac-gray6">{{ tier.max_context }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Temperature</span>
+                        <span class="font-mono text-ac-gray6">{{ tier.temperature }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Cost (per 1M tokens)</span>
+                        <span class="text-ac-gray6">
+                            <span class="text-ac-green">${{ tier.cost_input }}</span> in /
+                            <span class="text-ac-orange">${{ tier.cost_output }}</span> out
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Max Tokens</span>
+                        <span class="font-mono text-ac-gray6">{{ tier.max_tokens }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Fallback</span>
+                        <span class="font-mono text-xs {% if tier.fallback_model %}text-ac-gray6{% else %}text-ac-gray2{% endif %}">
+                            {% if tier.fallback_model %}{{ tier.fallback_model }} ({{ tier.fallback_provider }}){% else %}None{% endif %}
+                        </span>
+                    </div>
+                    {% if tier.get('extended_thinking') %}
+                    <div class="flex justify-between">
+                        <span class="text-ac-gray3">Extended Thinking</span>
+                        <span class="text-ac-green font-medium">Enabled</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-ac-border">
+                    <p class="text-xs text-ac-gray3 mb-2">Tasks</p>
+                    <div class="flex flex-wrap gap-1">
+                        {% for task in tier.tasks %}
+                        <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">{{ task }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Gateway Config -->
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <h3 class="text-sm font-semibold text-ac-gray6 mb-4">Gateway Configuration</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {% for feature, enabled in [('Prompt Caching', llm_config.gateway.prompt_caching), ('PII Redaction', llm_config.gateway.pii_redaction), ('Injection Detection', llm_config.gateway.injection_detection), ('Output Validation', llm_config.gateway.output_validation)] %}
+                <div class="flex items-center space-x-2">
+                    {% if enabled %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-ac-green inline-block"></span>
+                    <span class="text-sm text-ac-gray6">{{ feature }}</span>
+                    {% else %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-500 inline-block"></span>
+                    <span class="text-sm text-ac-gray3">{{ feature }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-ac-gray3">Max Retries:</span>
+                    <span class="text-sm font-mono text-ac-gray6">{{ llm_config.gateway.max_retries }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-ac-gray3">Base Delay:</span>
+                    <span class="text-sm font-mono text-ac-gray6">{{ llm_config.gateway.base_delay }}s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Routing -->
+        <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+            <div class="px-4 py-3 border-b border-ac-border">
+                <h3 class="text-sm font-semibold text-ac-gray6">Task Routing</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase">
+                        <th class="px-4 py-2 text-left">Task</th>
+                        <th class="px-4 py-2 text-left">Tier</th>
+                        <th class="px-4 py-2 text-left">Model</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for tier in llm_config.tiers %}
+                    {% for task in tier.tasks %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-4 py-2 font-mono text-ac-gray6">{{ task }}</td>
+                        <td class="px-4 py-2">
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">{{ tier.name }}</span>
+                        </td>
+                        <td class="px-4 py-2 font-mono text-ac-blue text-xs">{{ tier.model }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Spend by Model -->
+        {% if llm_stats.get('by_model') %}
+        <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+            <div class="px-4 py-3 border-b border-ac-border">
+                <h3 class="text-sm font-semibold text-ac-gray6">Spend by Model</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase">
+                        <th class="px-4 py-2 text-left">Model</th>
+                        <th class="px-4 py-2 text-right">Calls</th>
+                        <th class="px-4 py-2 text-right">Spend (USD)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700/50">
+                    {% for row in llm_stats.by_model %}
+                    <tr class="hover:bg-ac-cardHover/30">
+                        <td class="px-4 py-2 font-mono text-ac-blue text-xs">{{ row.model_id }}</td>
+                        <td class="px-4 py-2 text-right text-ac-gray6">{{ row.calls }}</td>
+                        <td class="px-4 py-2 text-right text-ac-green">${{ "%.2f"|format(row.spend) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function showSection(id) {
+        document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById('section-' + id).classList.remove('hidden');
+        document.querySelectorAll('.section-tab').forEach(tab => {
+            const isActive = tab.dataset.section === id;
+            tab.classList.toggle('border-ac-red', isActive);
+            tab.classList.toggle('text-ac-blue', isActive);
+            tab.classList.toggle('border-transparent', !isActive);
+            tab.classList.toggle('text-ac-gray4', !isActive);
+        });
+    }
+
+    async function reconnectService(serviceId, btn) {
+        btn.disabled = true;
+        btn.textContent = 'Connecting...';
+        try {
+            const resp = await fetch(`/api/settings/reconnect/${serviceId}`, { method: 'POST' });
+            const data = await resp.json();
+            if (resp.ok) {
+                btn.textContent = 'Connected!';
+                btn.classList.remove('bg-ac-blue', 'hover:bg-ac-blueDark');
+                btn.classList.add('bg-ac-green');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                btn.textContent = 'Failed';
+                btn.classList.remove('bg-ac-blue', 'hover:bg-ac-blueDark');
+                btn.classList.add('bg-ac-red');
+                alert('Reconnect failed: ' + (data.detail || 'Unknown error'));
+                setTimeout(() => {
+                    btn.textContent = 'Reconnect';
+                    btn.classList.remove('bg-ac-red');
+                    btn.classList.add('bg-ac-blue', 'hover:bg-ac-blueDark');
+                    btn.disabled = false;
+                }, 3000);
+            }
+        } catch (ex) {
+            btn.textContent = 'Error';
+            alert('Network error: ' + ex.message);
+            btn.disabled = false;
+        }
+    }
+
+    async function runMigrations(btn) {
+        const result = btn.parentElement.querySelector('.migration-result');
+        btn.disabled = true;
+        btn.textContent = 'Running...';
+        result.textContent = '';
+        try {
+            const resp = await fetch('/api/settings/run-migrations', { method: 'POST' });
+            const data = await resp.json();
+            if (resp.ok) {
+                const ok = data.migrations.filter(m => m.status === 'ok').length;
+                const errs = data.migrations.filter(m => m.status !== 'ok').length;
+                btn.textContent = 'Run Migrations';
+                btn.disabled = false;
+                result.textContent = `${ok} succeeded, ${errs} errors`;
+                result.className = errs ? 'migration-result text-xs text-ac-orange ml-2' : 'migration-result text-xs text-ac-green ml-2';
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                btn.textContent = 'Run Migrations';
+                btn.disabled = false;
+                result.textContent = data.detail || 'Failed';
+                result.className = 'migration-result text-xs text-ac-red ml-2';
+            }
+        } catch (ex) {
+            btn.textContent = 'Run Migrations';
+            btn.disabled = false;
+            result.textContent = ex.message;
+        }
+    }
+</script>
+{% endblock %}

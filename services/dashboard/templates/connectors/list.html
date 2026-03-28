@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Connectors - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold">Connectors</h1>
+            <p class="text-sm text-ac-gray4 mt-1">SIEM ingestion, CTEM exposure tools, and threat intelligence feeds</p>
+        </div>
+        <button onclick="document.getElementById('add-modal').classList.remove('hidden')"
+                class="bg-ac-blue hover:bg-ac-blueDark text-white px-4 py-2 rounded text-sm font-medium">
+            + Add Connector
+        </button>
+    </div>
+
+    <!-- Category Tabs -->
+    <div class="border-b border-ac-border">
+        <nav class="flex space-x-6" id="category-tabs">
+            <button onclick="filterCategory('all')" data-cat="all"
+                    class="cat-tab pb-3 text-sm font-medium border-b-2 border-ac-red text-ac-blue">
+                All
+                <span class="ml-1 text-xs bg-ac-border px-1.5 py-0.5 rounded">{{ connectors|length }}</span>
+            </button>
+            {% for cat in connector_categories %}
+            <button onclick="filterCategory('{{ cat.id }}')" data-cat="{{ cat.id }}"
+                    class="cat-tab pb-3 text-sm font-medium border-b-2 border-transparent text-ac-gray4 hover:text-ac-white">
+                {{ cat.label }}
+                <span class="ml-1 text-xs bg-ac-border px-1.5 py-0.5 rounded">
+                    {{ connectors|selectattr('adapter_type', 'in', connector_types|selectattr('category', 'equalto', cat.id)|map(attribute='adapter_type')|list)|list|length }}
+                </span>
+            </button>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <!-- Connector Cards -->
+    <div id="connector-list" class="space-y-4">
+        {% for conn in connectors %}
+        {% set ct_match = connector_types|selectattr('adapter_type', 'equalto', conn.adapter_type)|first %}
+        <div class="connector-card bg-ac-card rounded-ac border border-ac-border p-5"
+             id="conn-{{ conn.connector_id }}"
+             data-category="{{ ct_match.category if ct_match else 'siem' }}">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <!-- Adapter badge with category color -->
+                        {% if ct_match and ct_match.category == 'ctem' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-purple/20 text-ac-purple">{{ conn.adapter_type|upper }}</span>
+                        {% elif ct_match and ct_match.category == 'cti' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-blue/15 text-ac-blue">{{ conn.adapter_type|upper }}</span>
+                        {% elif conn.adapter_type == 'elastic' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-green/20 text-ac-green">ELASTIC</span>
+                        {% elif conn.adapter_type == 'splunk' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-orange/20 text-ac-orange">SPLUNK</span>
+                        {% elif conn.adapter_type == 'sentinel' %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-blue/20 text-ac-blue">SENTINEL</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-ac-border text-ac-gray6">{{ conn.adapter_type|upper }}</span>
+                        {% endif %}
+
+                        <!-- Category label -->
+                        {% if ct_match %}
+                        <span class="px-2 py-0.5 rounded text-xs bg-ac-border/50 text-ac-gray3">{{ ct_match.category|upper }}</span>
+                        {% endif %}
+
+                        <!-- Mode badge -->
+                        <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">{{ conn.connector_mode }}</span>
+
+                        <!-- Status -->
+                        {% if conn.enabled %}
+                        <span class="flex items-center text-xs text-ac-green">
+                            <span class="w-2 h-2 rounded-full bg-ac-green mr-1"></span> Enabled
+                        </span>
+                        {% else %}
+                        <span class="flex items-center text-xs text-ac-gray3">
+                            <span class="w-2 h-2 rounded-full bg-gray-500 mr-1"></span> Disabled
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <h3 class="text-lg font-medium text-ac-white">{{ conn.name }}</h3>
+
+                    <div class="text-sm text-ac-gray4 mt-2 space-y-1">
+                        <p>Tenant: <span class="text-ac-gray6">{{ conn.tenant_id }}</span></p>
+                        {% if conn.config %}
+                        {% set cfg = conn.config if conn.config is mapping else {} %}
+                        {% for key in ['es_host', 'splunk_host', 'workspace_id', 'wiz_api_url', 'snyk_org_id', 'misp_url', 'taxii_url'] %}
+                        {% if cfg.get(key) %}
+                        <p>{{ key|replace('_', ' ')|title }}: <span class="text-ac-gray6">{{ cfg[key] }}</span></p>
+                        {% endif %}
+                        {% endfor %}
+                        {% if cfg.get('poll_interval') %}
+                        <p>Poll Interval: <span class="text-ac-gray6">{{ cfg.poll_interval }}s</span></p>
+                        {% endif %}
+                        {% endif %}
+                        <p class="text-xs text-ac-gray3">Created: {{ conn.created_at }}</p>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-col space-y-2 ml-4">
+                    <button hx-post="/api/connectors/{{ conn.connector_id }}/toggle"
+                            hx-target="#connector-list"
+                            hx-swap="outerHTML"
+                            hx-select="#connector-list"
+                            hx-trigger="click"
+                            class="{% if conn.enabled %}bg-ac-orange hover:bg-ac-orange{% else %}bg-ac-green hover:bg-ac-greenDark{% endif %} text-white px-3 py-1.5 rounded text-xs font-medium">
+                        {% if conn.enabled %}Disable{% else %}Enable{% endif %}
+                    </button>
+                    <button hx-delete="/api/connectors/{{ conn.connector_id }}"
+                            hx-confirm="Delete this connector?"
+                            hx-target="#conn-{{ conn.connector_id }}"
+                            hx-swap="outerHTML"
+                            class="bg-ac-red hover:bg-ac-redDark text-white px-3 py-1.5 rounded text-xs font-medium">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div id="empty-state" class="text-center py-12 text-ac-gray3">
+            <p class="text-lg">No connectors configured.</p>
+            <p class="text-sm mt-2">Click "+ Add Connector" to set up event ingestion, exposure scanning, or threat intel feeds.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Connector Modal -->
+<div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="bg-ac-card rounded-ac border border-ac-border w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">Add Connector</h2>
+            <button onclick="document.getElementById('add-modal').classList.add('hidden')"
+                    class="text-ac-gray4 hover:text-ac-white text-xl">&times;</button>
+        </div>
+
+        <form id="add-connector-form" class="space-y-4">
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Name</label>
+                <input name="name" type="text" required placeholder="e.g. Production Elastic"
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Connector Type</label>
+                <select name="adapter_type" id="adapter-type-select" required
+                        onchange="updateFormFields()"
+                        class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+                    <option value="">Select...</option>
+                    {% for cat in connector_categories %}
+                    <optgroup label="{{ cat.label }}">
+                        {% for ct in connector_types %}
+                        {% if ct.category == cat.id %}
+                        <option value="{{ ct.adapter_type }}">{{ ct.label }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="mode-field" class="hidden">
+                <label class="block text-sm text-ac-gray4 mb-1">Connection Mode</label>
+                <select name="connector_mode" id="mode-select"
+                        onchange="updateFormFields()"
+                        class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+                </select>
+            </div>
+
+            <div id="dynamic-fields" class="space-y-3"></div>
+
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">Tenant ID</label>
+                <input name="tenant_id" type="text" value="default"
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <input name="enabled" type="checkbox" checked id="enabled-check"
+                       class="rounded bg-ac-border border-ac-borderLight">
+                <label for="enabled-check" class="text-sm text-ac-gray4">Enable immediately</label>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button"
+                        onclick="document.getElementById('add-modal').classList.add('hidden')"
+                        class="px-4 py-2 rounded text-sm text-ac-gray4 hover:text-ac-white">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="bg-ac-blue hover:bg-ac-blueDark text-white px-4 py-2 rounded text-sm font-medium">
+                    Create Connector
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const connectorTypes = {{ connector_types | tojson }};
+
+    // -- Category filtering --
+    function filterCategory(cat) {
+        document.querySelectorAll('.cat-tab').forEach(tab => {
+            const isActive = tab.dataset.cat === cat;
+            tab.classList.toggle('border-ac-red', isActive);
+            tab.classList.toggle('text-ac-blue', isActive);
+            tab.classList.toggle('border-transparent', !isActive);
+            tab.classList.toggle('text-ac-gray4', !isActive);
+        });
+        document.querySelectorAll('.connector-card').forEach(card => {
+            if (cat === 'all' || card.dataset.category === cat) {
+                card.classList.remove('hidden');
+            } else {
+                card.classList.add('hidden');
+            }
+        });
+    }
+
+    // -- Dynamic form fields --
+    function updateFormFields() {
+        const adapterType = document.getElementById('adapter-type-select').value;
+        const modeField = document.getElementById('mode-field');
+        const modeSelect = document.getElementById('mode-select');
+        const dynamicFields = document.getElementById('dynamic-fields');
+
+        const ct = connectorTypes.find(c => c.adapter_type === adapterType);
+        if (!ct) {
+            modeField.classList.add('hidden');
+            dynamicFields.innerHTML = '';
+            return;
+        }
+
+        modeSelect.innerHTML = ct.modes.map(m =>
+            `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`
+        ).join('');
+        if (ct.modes.length > 1) {
+            modeField.classList.remove('hidden');
+        } else {
+            modeField.classList.add('hidden');
+        }
+
+        renderDynamicFields(ct);
+    }
+
+    function renderDynamicFields(ct) {
+        const mode = document.getElementById('mode-select').value;
+        const container = document.getElementById('dynamic-fields');
+
+        const fields = ct.fields.filter(f => {
+            if (!f.show_for) return true;
+            return f.show_for === mode;
+        });
+
+        container.innerHTML = fields.map(f => `
+            <div>
+                <label class="block text-sm text-ac-gray4 mb-1">${f.label}</label>
+                <input name="cfg_${f.name}"
+                       type="${f.type === 'password' ? 'password' : f.type === 'number' ? 'number' : 'text'}"
+                       placeholder="${f.placeholder || ''}"
+                       ${f.required ? 'required' : ''}
+                       class="w-full bg-ac-border border border-ac-borderLight rounded px-3 py-2 text-sm text-ac-white focus:outline-none focus:border-ac-red">
+            </div>
+        `).join('');
+    }
+
+    // -- Form submission --
+    document.getElementById('add-connector-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const data = new FormData(form);
+
+        const config = {};
+        for (const [key, val] of data.entries()) {
+            if (key.startsWith('cfg_') && val) {
+                config[key.slice(4)] = val;
+            }
+        }
+
+        const body = {
+            name: data.get('name'),
+            adapter_type: data.get('adapter_type'),
+            connector_mode: data.get('connector_mode') || 'polling',
+            config: config,
+            enabled: !!data.get('enabled'),
+            tenant_id: data.get('tenant_id') || 'default',
+        };
+
+        try {
+            const resp = await fetch('/api/connectors', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+            });
+            if (resp.ok) {
+                document.getElementById('add-modal').classList.add('hidden');
+                window.location.reload();
+            } else {
+                const err = await resp.json();
+                alert('Error: ' + (err.detail || 'Failed to create connector'));
+            }
+        } catch (ex) {
+            alert('Network error: ' + ex.message);
+        }
+    });
+</script>
+{% endblock %}

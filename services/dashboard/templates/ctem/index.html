@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+{% block title %}CTEM Exposures - ALUSKORT{% endblock %}
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold">CTEM Exposures</h1>
+        <p class="text-sm text-ac-gray4 mt-1">Continuous Threat Exposure Management — unified view of findings from all scanning tools</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Total Exposures</p>
+            <p class="text-3xl font-bold text-ac-white mt-1">{{ stats.total }}</p>
+            <p class="text-xs text-ac-gray3 mt-1">{{ stats.validations_count }} validated &middot; {{ stats.remediations_count }} remediated</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Critical</p>
+            <p class="text-3xl font-bold text-ac-red mt-1">{{ stats.by_severity.CRITICAL }}</p>
+            <p class="text-xs text-ac-gray3 mt-1">SLA: 24 hours</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Open</p>
+            <p class="text-3xl font-bold text-ac-orange mt-1">{{ stats.by_status.open }}</p>
+            <p class="text-xs text-ac-gray3 mt-1">{{ stats.by_status.in_progress }} in progress</p>
+        </div>
+        <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+            <p class="text-sm text-ac-gray4">Sources Active</p>
+            <p class="text-3xl font-bold text-ac-blue mt-1">{{ stats.sources_active }}</p>
+            <p class="text-xs text-ac-gray3 mt-1">of {{ sources|length }} configured</p>
+        </div>
+    </div>
+
+    <!-- Severity Breakdown Bar -->
+    {% set sev = stats.by_severity %}
+    {% set sev_total = sev.CRITICAL + sev.HIGH + sev.MEDIUM + sev.LOW %}
+    {% if sev_total > 0 %}
+    <div class="bg-ac-card rounded-ac border border-ac-border p-5">
+        <h2 class="text-sm font-semibold text-ac-gray6 mb-3">Severity Breakdown</h2>
+        <div class="flex rounded-full overflow-hidden h-4 bg-ac-border">
+            {% if sev.CRITICAL > 0 %}
+            <div class="bg-ac-red h-full" style="width: {{ (sev.CRITICAL / sev_total * 100)|round(1) }}%"
+                 title="Critical: {{ sev.CRITICAL }}"></div>
+            {% endif %}
+            {% if sev.HIGH > 0 %}
+            <div class="bg-ac-orange h-full" style="width: {{ (sev.HIGH / sev_total * 100)|round(1) }}%"
+                 title="High: {{ sev.HIGH }}"></div>
+            {% endif %}
+            {% if sev.MEDIUM > 0 %}
+            <div class="bg-yellow-500 h-full" style="width: {{ (sev.MEDIUM / sev_total * 100)|round(1) }}%"
+                 title="Medium: {{ sev.MEDIUM }}"></div>
+            {% endif %}
+            {% if sev.LOW > 0 %}
+            <div class="bg-ac-gray3 h-full" style="width: {{ (sev.LOW / sev_total * 100)|round(1) }}%"
+                 title="Low: {{ sev.LOW }}"></div>
+            {% endif %}
+        </div>
+        <div class="flex items-center space-x-6 mt-3 text-xs text-ac-gray4">
+            <span class="flex items-center space-x-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-red inline-block"></span>
+                <span>Critical {{ sev.CRITICAL }}</span>
+            </span>
+            <span class="flex items-center space-x-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-orange inline-block"></span>
+                <span>High {{ sev.HIGH }}</span>
+            </span>
+            <span class="flex items-center space-x-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+                <span>Medium {{ sev.MEDIUM }}</span>
+            </span>
+            <span class="flex items-center space-x-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-ac-gray3 inline-block"></span>
+                <span>Low {{ sev.LOW }}</span>
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+        <form id="ctem-filters" class="flex flex-wrap items-end gap-4">
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Severity</label>
+                <select id="filter-severity"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="CRITICAL">Critical</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Source Tool</label>
+                <select id="filter-source"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="wiz">Wiz</option>
+                    <option value="snyk">Snyk</option>
+                    <option value="garak">Garak</option>
+                    <option value="art">ART</option>
+                    <option value="burp">Burp</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Status</label>
+                <select id="filter-status"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="remediated">Remediated</option>
+                    <option value="verified">Verified</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-ac-gray4 mb-1">Asset Zone</label>
+                <select id="filter-zone"
+                        class="bg-ac-surface border border-ac-border rounded-ac text-sm text-ac-white px-3 py-1.5 focus:outline-none">
+                    <option value="">All</option>
+                    <option value="Zone0_PhysicalProcess">Zone 0 - Physical Process</option>
+                    <option value="Zone0_Safety">Zone 0 - Safety</option>
+                    <option value="Zone1_BasicControl">Zone 1 - Basic Control</option>
+                    <option value="Zone1_EdgeInference">Zone 1 - Edge Inference</option>
+                    <option value="Zone2_Operations">Zone 2 - Operations</option>
+                    <option value="Zone2_SCADA">Zone 2 - SCADA</option>
+                    <option value="Zone3_Enterprise">Zone 3 - Enterprise</option>
+                    <option value="Zone3_5_DMZ">Zone 3.5 - DMZ</option>
+                    <option value="Cloud_Production">Cloud - Production</option>
+                    <option value="Cloud_Staging">Cloud - Staging</option>
+                    <option value="IT_DataCenter">IT - Data Center</option>
+                </select>
+            </div>
+            <button type="button" onclick="applyFilters()"
+                    class="ac-btn ac-btn-primary">
+                Apply
+            </button>
+            <button type="button" onclick="clearFilters()"
+                    class="ac-btn ac-btn-ghost">
+                Clear
+            </button>
+        </form>
+    </div>
+
+    <!-- Exposure Table -->
+    <div class="bg-ac-card rounded-ac border border-ac-border overflow-hidden">
+        <div class="px-5 py-3 border-b border-ac-border flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-ac-gray6">Exposures</h2>
+            <span class="text-xs text-ac-gray3" id="exposure-count">{{ exposures|length }} shown</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-ac-gray3 uppercase border-b border-ac-border">
+                        <th class="px-4 py-3 text-left">Severity</th>
+                        <th class="px-4 py-3 text-left">Title</th>
+                        <th class="px-4 py-3 text-left">Source</th>
+                        <th class="px-4 py-3 text-left">Asset</th>
+                        <th class="px-4 py-3 text-left">Zone</th>
+                        <th class="px-4 py-3 text-right">CTEM Score</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                        <th class="px-4 py-3 text-left">SLA Deadline</th>
+                    </tr>
+                </thead>
+                <tbody id="exposure-tbody" class="divide-y divide-gray-700/50">
+                    {% for exp in exposures %}
+                    <tr class="hover:bg-ac-cardHover/30 cursor-pointer exposure-row"
+                        onclick="toggleDetail(this)"
+                        data-key="{{ exp.exposure_key }}">
+                        <td class="px-4 py-3">
+                            {% if exp.severity == 'CRITICAL' %}
+                            <span class="ac-badge bg-ac-red/20 text-ac-red">CRITICAL</span>
+                            {% elif exp.severity == 'HIGH' %}
+                            <span class="ac-badge bg-ac-orange/20 text-ac-orange">HIGH</span>
+                            {% elif exp.severity == 'MEDIUM' %}
+                            <span class="ac-badge bg-yellow-500/20 text-yellow-400">MEDIUM</span>
+                            {% else %}
+                            <span class="ac-badge bg-ac-border text-ac-gray6">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-ac-white font-medium max-w-xs truncate">{{ exp.title }}</td>
+                        <td class="px-4 py-3">
+                            <span class="font-mono text-ac-blue text-xs">{{ exp.source_tool }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-ac-gray4 text-xs font-mono max-w-[10rem] truncate">{{ exp.asset_id or '—' }}</td>
+                        <td class="px-4 py-3 text-ac-gray4 text-xs">{{ exp.asset_zone or '—' }}</td>
+                        <td class="px-4 py-3 text-right">
+                            {% if exp.ctem_score is not none %}
+                            <span class="font-mono font-semibold
+                                {% if exp.ctem_score >= 8.0 %}text-ac-red
+                                {% elif exp.ctem_score >= 5.0 %}text-ac-orange
+                                {% elif exp.ctem_score >= 3.0 %}text-yellow-400
+                                {% else %}text-ac-gray4{% endif %}">
+                                {{ '%.1f'|format(exp.ctem_score) }}
+                            </span>
+                            {% else %}
+                            <span class="text-ac-gray3">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if exp.status == 'open' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-red/15 text-ac-red">open</span>
+                            {% elif exp.status == 'in_progress' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-blue/15 text-ac-blue">in progress</span>
+                            {% elif exp.status == 'remediated' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-green/15 text-ac-green">remediated</span>
+                            {% elif exp.status == 'verified' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-purple/15 text-ac-purple">verified</span>
+                            {% elif exp.status == 'closed' %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray4">closed</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray4">{{ exp.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-xs text-ac-gray4">
+                            {% if exp.sla_deadline %}
+                            {{ exp.sla_deadline }}
+                            {% else %}
+                            <span class="text-ac-gray3">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <!-- Expandable detail row -->
+                    <tr class="hidden detail-row bg-ac-surface/60" data-detail-for="{{ exp.exposure_key }}">
+                        <td colspan="8" class="px-6 py-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div class="space-y-2">
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Description:</span>
+                                        {{ exp.description or 'No description available' }}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Asset Type:</span>
+                                        <span class="font-mono">{{ exp.asset_type or '—' }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Original Severity:</span>
+                                        {{ exp.original_severity or '—' }}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Exploitability Score:</span>
+                                        <span class="font-mono">{{ exp.exploitability_score if exp.exploitability_score is not none else '—' }}</span>
+                                    </p>
+                                </div>
+                                <div class="space-y-2">
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Physical Consequence:</span>
+                                        {% if exp.physical_consequence == 'safety_life' %}
+                                        <span class="px-2 py-0.5 rounded text-xs bg-ac-red/20 text-ac-red">safety_life</span>
+                                        {% elif exp.physical_consequence == 'equipment' %}
+                                        <span class="px-2 py-0.5 rounded text-xs bg-ac-orange/20 text-ac-orange">equipment</span>
+                                        {% elif exp.physical_consequence == 'downtime' %}
+                                        <span class="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">downtime</span>
+                                        {% elif exp.physical_consequence %}
+                                        <span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray6">{{ exp.physical_consequence }}</span>
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">ATLAS Technique:</span>
+                                        <span class="font-mono">{{ exp.atlas_technique or '—' }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">ATT&CK Technique:</span>
+                                        <span class="font-mono">{{ exp.attack_technique or '—' }}</span>
+                                    </p>
+                                    <p class="text-ac-gray4">
+                                        <span class="text-ac-gray6 font-medium">Assigned To:</span>
+                                        {{ exp.assigned_to or 'Unassigned' }}
+                                    </p>
+                                </div>
+                                {% if exp.remediation_guidance %}
+                                <div class="md:col-span-2">
+                                    <p class="text-ac-gray6 font-medium mb-1">Remediation Guidance:</p>
+                                    <p class="text-sm text-ac-gray4 bg-ac-border/30 rounded px-3 py-2">{{ exp.remediation_guidance }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if not exposures %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-12 text-center text-ac-gray3">
+                            <p class="text-lg">No exposures found</p>
+                            <p class="text-sm mt-1">Connect a CTEM source tool via <a href="/connectors" class="text-ac-blue hover:underline">Connectors</a> to start ingesting findings.</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Source Pipeline -->
+    <div>
+        <h2 class="text-lg font-semibold mb-4">Source Pipeline</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {% for src in sources %}
+            <div class="bg-ac-card rounded-ac border border-ac-border p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-ac-white">{{ src.label }}</h3>
+                    {% if src.status == 'active' %}
+                    <span class="w-2 h-2 rounded-full bg-ac-green"></span>
+                    {% else %}
+                    <span class="w-2 h-2 rounded-full bg-ac-gray2"></span>
+                    {% endif %}
+                </div>
+                <p class="text-xs text-ac-gray4 mb-3">{{ src.description }}</p>
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-ac-gray3">Kafka Topic</span>
+                        <span class="font-mono text-ac-blue">{{ src.kafka_topic }}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-ac-gray3">Status</span>
+                        {% if src.status == 'active' %}
+                        <span class="text-ac-green font-medium">Active</span>
+                        {% else %}
+                        <span class="text-ac-gray4">Idle</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-ac-gray3">Exposures</span>
+                        <span class="font-mono text-ac-white font-medium">{{ src.count }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function toggleDetail(row) {
+        const key = row.dataset.key;
+        const detail = document.querySelector(`tr[data-detail-for="${key}"]`);
+        if (detail) {
+            detail.classList.toggle('hidden');
+        }
+    }
+
+    function applyFilters() {
+        const severity = document.getElementById('filter-severity').value;
+        const source = document.getElementById('filter-source').value;
+        const status = document.getElementById('filter-status').value;
+        const zone = document.getElementById('filter-zone').value;
+
+        const params = new URLSearchParams();
+        if (severity) params.set('severity', severity);
+        if (source) params.set('source_tool', source);
+        if (status) params.set('status', status);
+        if (zone) params.set('asset_zone', zone);
+
+        fetch('/api/ctem/exposures?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.getElementById('exposure-tbody');
+                const countEl = document.getElementById('exposure-count');
+                countEl.textContent = data.count + ' shown';
+
+                if (data.exposures.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="px-4 py-12 text-center text-ac-gray3">
+                                <p class="text-lg">No exposures match filters</p>
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                let html = '';
+                data.exposures.forEach(exp => {
+                    const sevBadge = exp.severity === 'CRITICAL'
+                        ? '<span class="ac-badge bg-ac-red/20 text-ac-red">CRITICAL</span>'
+                        : exp.severity === 'HIGH'
+                        ? '<span class="ac-badge bg-ac-orange/20 text-ac-orange">HIGH</span>'
+                        : exp.severity === 'MEDIUM'
+                        ? '<span class="ac-badge bg-yellow-500/20 text-yellow-400">MEDIUM</span>'
+                        : '<span class="ac-badge bg-ac-border text-ac-gray6">LOW</span>';
+
+                    const statusBadge = exp.status === 'open'
+                        ? '<span class="px-2 py-0.5 rounded text-xs bg-ac-red/15 text-ac-red">open</span>'
+                        : exp.status === 'in_progress'
+                        ? '<span class="px-2 py-0.5 rounded text-xs bg-ac-blue/15 text-ac-blue">in progress</span>'
+                        : exp.status === 'remediated'
+                        ? '<span class="px-2 py-0.5 rounded text-xs bg-ac-green/15 text-ac-green">remediated</span>'
+                        : exp.status === 'verified'
+                        ? '<span class="px-2 py-0.5 rounded text-xs bg-ac-purple/15 text-ac-purple">verified</span>'
+                        : '<span class="px-2 py-0.5 rounded text-xs bg-ac-border text-ac-gray4">' + (exp.status || '') + '</span>';
+
+                    const score = exp.ctem_score != null
+                        ? `<span class="font-mono font-semibold ${exp.ctem_score >= 8 ? 'text-ac-red' : exp.ctem_score >= 5 ? 'text-ac-orange' : exp.ctem_score >= 3 ? 'text-yellow-400' : 'text-ac-gray4'}">${exp.ctem_score.toFixed(1)}</span>`
+                        : '<span class="text-ac-gray3">\u2014</span>';
+
+                    html += `
+                        <tr class="hover:bg-ac-cardHover/30 cursor-pointer exposure-row"
+                            onclick="toggleDetail(this)"
+                            data-key="${exp.exposure_key}">
+                            <td class="px-4 py-3">${sevBadge}</td>
+                            <td class="px-4 py-3 text-ac-white font-medium max-w-xs truncate">${exp.title || ''}</td>
+                            <td class="px-4 py-3"><span class="font-mono text-ac-blue text-xs">${exp.source_tool || ''}</span></td>
+                            <td class="px-4 py-3 text-ac-gray4 text-xs font-mono max-w-[10rem] truncate">${exp.asset_id || '\u2014'}</td>
+                            <td class="px-4 py-3 text-ac-gray4 text-xs">${exp.asset_zone || '\u2014'}</td>
+                            <td class="px-4 py-3 text-right">${score}</td>
+                            <td class="px-4 py-3">${statusBadge}</td>
+                            <td class="px-4 py-3 text-xs text-ac-gray4">${exp.sla_deadline || '\u2014'}</td>
+                        </tr>
+                        <tr class="hidden detail-row bg-ac-surface/60" data-detail-for="${exp.exposure_key}">
+                            <td colspan="8" class="px-6 py-4">
+                                <div class="text-sm text-ac-gray4">
+                                    <p>${exp.description || 'No description available'}</p>
+                                </div>
+                            </td>
+                        </tr>`;
+                });
+                tbody.innerHTML = html;
+            })
+            .catch(err => console.error('Filter fetch failed:', err));
+    }
+
+    function clearFilters() {
+        document.getElementById('filter-severity').value = '';
+        document.getElementById('filter-source').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('filter-zone').value = '';
+        window.location.reload();
+    }
+</script>
+{% endblock %}
