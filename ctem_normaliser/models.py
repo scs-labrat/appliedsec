@@ -68,13 +68,54 @@ SLA_DEADLINES: dict[str, int] = {
     "LOW": 720,      # 30 days
 }
 
+# REM-H01: Expanded zone-consequence fallback — first-class module with
+# comprehensive coverage.  Every asset_zone value that can appear in CTEM
+# findings must have a mapping here.  Default: "data_loss" for unknown zones.
 ZONE_CONSEQUENCE_FALLBACK: dict[str, str] = {
+    # Purdue model zones
     "Zone0_PhysicalProcess": "safety_life",
+    "Zone0_Safety": "safety_life",
+    "Zone0_FieldDevices": "safety_life",
     "Zone1_EdgeInference": "equipment",
+    "Zone1_BasicControl": "equipment",
+    "Zone1_SensorNetwork": "equipment",
+    "Zone1_PLCNetwork": "equipment",
     "Zone2_Operations": "downtime",
+    "Zone2_AreaSupervisory": "downtime",
+    "Zone2_SCADA": "downtime",
+    "Zone2_HMI": "downtime",
     "Zone3_Enterprise": "data_loss",
+    "Zone3_SiteOperations": "downtime",
+    "Zone3_Manufacturing": "downtime",
+    "Zone3_5_DMZ": "data_loss",
     "Zone4_External": "data_loss",
+    "Zone4_Corporate": "data_loss",
+    "Zone4_Cloud": "data_loss",
+    "Zone5_Internet": "data_loss",
+    # Cloud and IT zones
+    "Cloud_Production": "downtime",
+    "Cloud_Staging": "data_loss",
+    "Cloud_Development": "data_loss",
+    "Cloud_Management": "downtime",
+    "IT_DataCenter": "downtime",
+    "IT_UserWorkstations": "data_loss",
+    "IT_NetworkInfra": "downtime",
+    # OT-specific zones
+    "OT_FieldBus": "equipment",
+    "OT_ControlNetwork": "equipment",
+    "OT_ProcessNetwork": "safety_life",
+    "OT_SafetyInstrumentedSystem": "safety_life",
 }
+ZONE_CONSEQUENCE_DEFAULT = "data_loss"
+
+
+def get_zone_consequence(asset_zone: str) -> str:
+    """Return consequence category for a zone, with safe default.
+
+    Uses ZONE_CONSEQUENCE_FALLBACK mapping.  Unknown zones default to
+    ``"data_loss"`` (the least severe consequence) to avoid false negatives.
+    """
+    return ZONE_CONSEQUENCE_FALLBACK.get(asset_zone, ZONE_CONSEQUENCE_DEFAULT)
 
 
 def generate_exposure_key(source_tool: str, title: str, asset_id: str) -> str:

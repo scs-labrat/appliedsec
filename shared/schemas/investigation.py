@@ -46,6 +46,7 @@ class DecisionEntry:
     reasoning: str = ""
     confidence: float = 0.0
     attestation_status: str = ""
+    taxonomy_version: str = ""
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like access for backward compatibility with dict entries."""

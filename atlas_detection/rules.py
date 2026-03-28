@@ -735,8 +735,9 @@ class EdgeCompromiseRule(DetectionRule):
 
             if triggered:
                 confidence = self._apply_confidence_floor(0.85)
-                # Apply trust downgrade for edge node telemetry
+                # REM-H04: Apply trust downgrade then re-apply floor
                 conf, trust = self._apply_trust_downgrade(confidence, "edge_node_telemetry")
+                conf = self._apply_confidence_floor(conf)
 
                 att_status = attestation if attestation else "unavailable"
 

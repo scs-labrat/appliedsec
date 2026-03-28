@@ -179,10 +179,13 @@ class TestEscalation:
 
 class TestHelpers:
     def test_build_reasoning_context(self, state):
-        ctx = _build_reasoning_context(state)
-        data = json.loads(ctx)
-        assert data["alert_id"] == "alert-001"
-        assert data["severity"] == "high"
+        evidence, retrieval = _build_reasoning_context(state)
+        ev_data = json.loads(evidence)
+        ret_data = json.loads(retrieval)
+        assert ev_data["alert_id"] == "alert-001"
+        assert ev_data["severity"] == "high"
+        assert "similar_incidents" in ret_data
+        assert "ueba_context" in ret_data
 
     def test_parse_classification_valid(self):
         data = {"classification": "true_positive", "confidence": 0.9}

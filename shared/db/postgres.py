@@ -122,6 +122,41 @@ class PostgresClient:
             async with conn.transaction():
                 yield _TransactionProxy(conn)
 
+    async def get_technique_ids(self) -> set[str]:
+        """Load all valid technique IDs from the taxonomy_ids table.
+
+        Returns a set of technique ID strings (e.g. ``{'T1059.001', 'AML.T0043'}``).
+        Returns an empty set if the table does not exist or is empty.
+        """
+        try:
+            pool = self._ensure_pool()
+            rows = await pool.fetch("SELECT technique_id FROM taxonomy_ids")
+            return {row["technique_id"] for row in rows}
+        except Exception:
+            logger.warning("Failed to load taxonomy_ids", exc_info=True)
+            return set()
+
+    async def get_taxonomy_version(self) -> str:
+        """Return the current taxonomy version string from taxonomy_metadata.
+
+        Concatenates ATT&CK and ATLAS versions (e.g. ``'attack-16.1+atlas-4.5.2'``).
+        Returns ``''`` if the metadata table does not exist or has no entries.
+        """
+        try:
+            pool = self._ensure_pool()
+            rows = await pool.fetch(
+                "SELECT key, value FROM taxonomy_metadata "
+                "WHERE key IN ('attack_version', 'atlas_version') "
+                "ORDER BY key"
+            )
+            if not rows:
+                return ""
+            parts = [f"{r['key'].replace('_version', '')}-{r['value']}" for r in rows]
+            return "+".join(parts)
+        except Exception:
+            logger.warning("Failed to load taxonomy version", exc_info=True)
+            return ""
+
     async def health_check(self) -> bool:
         """Run SELECT 1 and return True if the pool is healthy."""
         try:

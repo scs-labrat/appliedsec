@@ -2,10 +2,13 @@
 
 Manages incremental promotion from shadow mode to full autonomy,
 with automatic promotion criteria and rollback safety nets.
+
+REM-H05 adds ``CanaryScheduler`` for periodic evaluation scheduling.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -244,3 +247,97 @@ class CanaryEvaluator:
             })
 
         return decisions
+
+
+# ---------------------------------------------------------------------------
+# REM-H05: Scheduled canary evaluation
+# ---------------------------------------------------------------------------
+
+class CanaryScheduler:
+    """Periodic canary evaluation scheduler.
+
+    Runs ``CanaryEvaluator.evaluate_all_slices()`` on a fixed interval.
+    Designed to be started as a background task within the asyncio event
+    loop that drives the investigation graph.
+
+    Usage::
+
+        scheduler = CanaryScheduler(evaluator, config, interval_seconds=3600)
+        task = scheduler.start()   # returns asyncio.Task
+        # ... later ...
+        scheduler.stop()
+        await task
+    """
+
+    def __init__(
+        self,
+        evaluator: CanaryEvaluator,
+        config: CanaryConfig,
+        interval_seconds: int = 3600,
+        audit_producer: Any | None = None,
+    ) -> None:
+        self._evaluator = evaluator
+        self._config = config
+        self._interval = interval_seconds
+        self._audit = audit_producer
+        self._running = False
+        self._task: asyncio.Task[None] | None = None
+
+    def start(self) -> asyncio.Task[None]:
+        """Start the periodic evaluation loop as an asyncio background task."""
+        if self._task is not None and not self._task.done():
+            logger.warning("CanaryScheduler already running")
+            return self._task
+        self._running = True
+        self._task = asyncio.create_task(self._run_loop(), name="canary_scheduler")
+        logger.info(
+            "CanaryScheduler started (interval=%ds, slices=%d)",
+            self._interval, len(self._config.slices),
+        )
+        return self._task
+
+    def stop(self) -> None:
+        """Signal the scheduler to stop after the current cycle."""
+        self._running = False
+        logger.info("CanaryScheduler stop requested")
+
+    @property
+    def is_running(self) -> bool:
+        return self._running and self._task is not None and not self._task.done()
+
+    async def _run_loop(self) -> None:
+        """Internal loop — evaluate, sleep, repeat."""
+        while self._running:
+            try:
+                decisions = await self._evaluator.evaluate_all_slices(self._config)
+                self._emit_cycle_complete(decisions)
+            except Exception:
+                logger.error("Canary evaluation cycle failed", exc_info=True)
+
+            # Sleep in small increments so stop() takes effect quickly
+            for _ in range(self._interval):
+                if not self._running:
+                    break
+                await asyncio.sleep(1)
+
+    def _emit_cycle_complete(self, decisions: list[dict[str, Any]]) -> None:
+        """Emit audit event after each evaluation cycle."""
+        if self._audit is None:
+            return
+        promotions = sum(1 for d in decisions if d["action"] == "promote")
+        rollbacks = sum(1 for d in decisions if d["action"] == "rollback")
+        try:
+            self._audit.emit(
+                event_type="canary.evaluation_cycle",
+                event_category="decision",
+                actor_type="agent",
+                actor_id="canary_scheduler",
+                context={
+                    "slices_evaluated": len(decisions),
+                    "promotions": promotions,
+                    "rollbacks": rollbacks,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+        except Exception:
+            logger.warning("Failed to emit canary.evaluation_cycle audit", exc_info=True)

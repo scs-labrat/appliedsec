@@ -13,7 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from shared.db.postgres import PostgresClient
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,26 @@ def validate_output(
 
     valid = len(errors) == 0
     return valid, errors, quarantined
+
+
+async def load_and_validate_output(
+    content: str,
+    *,
+    db: PostgresClient,
+    output_schema: dict[str, Any] | None = None,
+) -> tuple[bool, list[str], list[str], str]:
+    """Validate LLM output, loading technique IDs from the database.
+
+    Returns (valid, errors, quarantined_ids, taxonomy_version).
+    """
+    known_ids = await db.get_technique_ids()
+    taxonomy_version = await db.get_taxonomy_version()
+    valid, errors, quarantined = validate_output(
+        content,
+        known_technique_ids=known_ids if known_ids else None,
+        output_schema=output_schema,
+    )
+    return valid, errors, quarantined, taxonomy_version
 
 
 def _validate_schema(data: Any, schema: dict[str, Any]) -> list[str]:

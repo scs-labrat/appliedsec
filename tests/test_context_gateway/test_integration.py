@@ -99,8 +99,10 @@ class TestFullPipeline:
 
         call_args = client.complete.call_args
         user_msg = call_args.kwargs["messages"][0]["content"]
+        # REM-C03: injection text is lossy-summarized, not redacted with markers
         assert "ignore previous instructions" not in user_msg
-        assert "[REDACTED_INJECTION_ATTEMPT]" in user_msg
+        # No tuning oracle — redaction markers must NOT appear
+        assert "[REDACTED_INJECTION_ATTEMPT]" not in user_msg
         assert len(resp.injection_detections) > 0
 
 

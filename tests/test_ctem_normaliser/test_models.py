@@ -7,12 +7,14 @@ from ctem_normaliser.models import (
     CONSEQUENCE_WEIGHTS,
     SEVERITY_MATRIX,
     SLA_DEADLINES,
+    ZONE_CONSEQUENCE_DEFAULT,
     ZONE_CONSEQUENCE_FALLBACK,
     CTEMExposure,
     compute_ctem_score,
     compute_severity,
     compute_sla_deadline,
     generate_exposure_key,
+    get_zone_consequence,
 )
 
 
@@ -162,16 +164,70 @@ class TestComputeSLADeadline:
 
 
 class TestZoneFallback:
-    def test_all_zones_present(self):
-        expected = {"Zone0_PhysicalProcess", "Zone1_EdgeInference",
-                    "Zone2_Operations", "Zone3_Enterprise", "Zone4_External"}
-        assert set(ZONE_CONSEQUENCE_FALLBACK.keys()) == expected
+    """REM-H01: comprehensive zone-consequence fallback coverage."""
+
+    def test_minimum_zone_coverage(self):
+        """At least the 5 original Purdue zones plus expanded coverage."""
+        assert len(ZONE_CONSEQUENCE_FALLBACK) >= 30
 
     def test_zone0_safety_life(self):
-        assert ZONE_CONSEQUENCE_FALLBACK["Zone0_PhysicalProcess"] == "safety_life"
+        assert get_zone_consequence("Zone0_PhysicalProcess") == "safety_life"
 
-    def test_zone3_data_loss(self):
-        assert ZONE_CONSEQUENCE_FALLBACK["Zone3_Enterprise"] == "data_loss"
+    def test_zone0_safety_zone(self):
+        assert get_zone_consequence("Zone0_Safety") == "safety_life"
+
+    def test_zone1_equipment(self):
+        assert get_zone_consequence("Zone1_EdgeInference") == "equipment"
+
+    def test_zone1_plc(self):
+        assert get_zone_consequence("Zone1_PLCNetwork") == "equipment"
+
+    def test_zone2_operations(self):
+        assert get_zone_consequence("Zone2_Operations") == "downtime"
+
+    def test_zone2_scada(self):
+        assert get_zone_consequence("Zone2_SCADA") == "downtime"
+
+    def test_zone3_enterprise(self):
+        assert get_zone_consequence("Zone3_Enterprise") == "data_loss"
+
+    def test_zone3_manufacturing(self):
+        assert get_zone_consequence("Zone3_Manufacturing") == "downtime"
+
+    def test_zone4_external(self):
+        assert get_zone_consequence("Zone4_External") == "data_loss"
+
+    def test_cloud_production_downtime(self):
+        assert get_zone_consequence("Cloud_Production") == "downtime"
+
+    def test_cloud_development_data_loss(self):
+        assert get_zone_consequence("Cloud_Development") == "data_loss"
+
+    def test_ot_safety_instrumented_system(self):
+        assert get_zone_consequence("OT_SafetyInstrumentedSystem") == "safety_life"
+
+    def test_ot_control_network(self):
+        assert get_zone_consequence("OT_ControlNetwork") == "equipment"
+
+    def test_unknown_zone_defaults_data_loss(self):
+        """Unknown zones default to data_loss (least severe) to avoid false negatives."""
+        assert get_zone_consequence("Zone99_Unknown") == "data_loss"
+        assert get_zone_consequence("") == "data_loss"
+
+    def test_every_zone_maps_to_valid_consequence(self):
+        valid_consequences = {"safety_life", "equipment", "downtime", "data_loss"}
+        for zone, consequence in ZONE_CONSEQUENCE_FALLBACK.items():
+            assert consequence in valid_consequences, (
+                f"Zone {zone} maps to invalid consequence '{consequence}'"
+            )
+
+    def test_safety_zones_exist(self):
+        """At least one zone maps to each consequence category."""
+        consequences = set(ZONE_CONSEQUENCE_FALLBACK.values())
+        assert "safety_life" in consequences
+        assert "equipment" in consequences
+        assert "downtime" in consequences
+        assert "data_loss" in consequences
 
 
 class TestConsequenceWeights:

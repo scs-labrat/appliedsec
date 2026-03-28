@@ -179,3 +179,49 @@ class AutonomyGuard:
         if evaluation.fnr > FNR_CEILING:
             adjustment += 0.02
         return min(current_threshold + adjustment, 0.99)
+
+
+class EvaluationFeedbackLoop:
+    """Wires AutonomyGuard into ThresholdAdjuster for closed-loop control.
+
+    After each FP evaluation cycle, checks AutonomyGuard targets and
+    updates the ThresholdAdjuster used by FPShortCircuit. This ensures
+    that declining precision/recall automatically tightens auto-close
+    thresholds without manual intervention.
+    """
+
+    def __init__(
+        self,
+        autonomy_guard: AutonomyGuard,
+        threshold_adjuster: Any,
+    ) -> None:
+        self._guard = autonomy_guard
+        self._adjuster = threshold_adjuster
+        self._adjustment_history: list[dict[str, Any]] = []
+
+    def on_evaluation_complete(self, evaluation: FPEvaluationResult) -> float:
+        """Process an evaluation result and adjust thresholds if needed.
+
+        Returns the new effective threshold.
+        """
+        current = self._adjuster.get_threshold()
+        new_threshold = self._guard.get_adjusted_threshold(current, evaluation)
+
+        if new_threshold != current:
+            # AutonomyGuard raised the threshold — override the adjuster's
+            # normal level so FPShortCircuit sees the tighter value.
+            self._adjuster._normal = new_threshold
+            self._adjustment_history.append({
+                "rule_family": evaluation.rule_family,
+                "previous_threshold": current,
+                "new_threshold": new_threshold,
+                "precision": evaluation.precision,
+                "fnr": evaluation.fnr,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            })
+
+        return new_threshold
+
+    @property
+    def adjustment_history(self) -> list[dict[str, Any]]:
+        return list(self._adjustment_history)

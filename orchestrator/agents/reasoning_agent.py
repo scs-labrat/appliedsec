@@ -10,6 +10,7 @@ import json
 import logging
 from typing import Any
 
+from context_gateway.prompt_builder import build_request_with_budget
 from shared.schemas.investigation import GraphState, InvestigationState
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,14 @@ class ReasoningAgent:
         """
         state.state = InvestigationState.REASONING
 
-        # Build context for LLM
-        context = _build_reasoning_context(state)
+        # Build context for LLM with tier-based budget scaling (REM-M01)
+        evidence, retrieval = _build_reasoning_context(state)
+        user_content = build_request_with_budget(
+            system_instructions=REASONING_SYSTEM_PROMPT,
+            evidence_block=evidence,
+            retrieval_context=retrieval,
+            tier="tier_1",
+        )
 
         from context_gateway.gateway import GatewayRequest
 
@@ -55,7 +62,7 @@ class ReasoningAgent:
             agent_id="reasoning_agent",
             task_type="investigation",
             system_prompt=REASONING_SYSTEM_PROMPT,
-            user_content=context,
+            user_content=user_content,
             tenant_id=state.tenant_id,
         )
         response = await self._gateway.complete(request)
@@ -84,7 +91,7 @@ class ReasoningAgent:
 
         # Check escalation
         if self._needs_escalation(state):
-            state = await self._escalate(state, context)
+            state = await self._escalate(state, evidence, retrieval)
 
         # Determine next state
         if self._needs_human_approval(state):
@@ -103,15 +110,24 @@ class ReasoningAgent:
             state.confidence, state.severity
         )
 
-    async def _escalate(self, state: GraphState, context: str) -> GraphState:
+    async def _escalate(self, state: GraphState, evidence: str, retrieval: str) -> GraphState:
         """Re-analyse with Opus (Tier 1+)."""
         from context_gateway.gateway import GatewayRequest
+
+        escalated_prompt = REASONING_SYSTEM_PROMPT + "\n\nThis is an escalated analysis. Be thorough."
+        # REM-M01: tier_1_plus budget (16K tokens) for Opus escalation
+        user_content = build_request_with_budget(
+            system_instructions=escalated_prompt,
+            evidence_block=evidence,
+            retrieval_context=retrieval,
+            tier="tier_1_plus",
+        )
 
         request = GatewayRequest(
             agent_id="reasoning_agent_escalated",
             task_type="investigation",
-            system_prompt=REASONING_SYSTEM_PROMPT + "\n\nThis is an escalated analysis. Be thorough.",
-            user_content=context,
+            system_prompt=escalated_prompt,
+            user_content=user_content,
             tenant_id=state.tenant_id,
         )
         response = await self._gateway.complete(request)
@@ -151,20 +167,31 @@ class ReasoningAgent:
         return False
 
 
-def _build_reasoning_context(state: GraphState) -> str:
-    """Build JSON context string for the reasoning LLM."""
-    ctx = {
+def _build_reasoning_context(state: GraphState) -> tuple[str, str]:
+    """Build evidence and retrieval context strings for the reasoning LLM.
+
+    Returns (evidence_block, retrieval_context):
+      - evidence_block: core alert data wrapped for input isolation
+      - retrieval_context: supplemental context (similar incidents, risk) that
+        may be truncated by the budget scaler
+    """
+    evidence = {
         "alert_id": state.alert_id,
         "severity": state.severity,
         "entities": state.entities,
         "ioc_matches": state.ioc_matches,
-        "ueba_context": state.ueba_context,
         "ctem_exposures": state.ctem_exposures,
         "atlas_techniques": state.atlas_techniques,
+    }
+    retrieval = {
+        "ueba_context": state.ueba_context,
         "similar_incidents": state.similar_incidents,
         "risk_state": state.risk_state,
     }
-    return json.dumps(ctx, default=str)
+    return (
+        json.dumps(evidence, default=str),
+        json.dumps(retrieval, default=str),
+    )
 
 
 def _parse_classification(content: str) -> dict[str, Any]:

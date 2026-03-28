@@ -17,11 +17,18 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from context_gateway.anthropic_client import APICallMetrics, AluskortAnthropicClient
+from context_gateway.evidence_builder import EvidenceBlock
+from context_gateway.injection_classifier import (
+    InjectionAction,
+    InjectionClassification,
+    RegexInjectionClassifier,
+)
 from context_gateway.injection_detector import sanitise_input
 from context_gateway.output_validator import validate_output
 from context_gateway.pii_redactor import RedactionMap, deanonymise_text, redact_pii
-from context_gateway.prompt_builder import build_cached_system_blocks
+from context_gateway.prompt_builder import build_cached_system_blocks, build_structured_prompt
 from context_gateway.spend_guard import SpendGuard
+from context_gateway.summarizer import transform_content
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +61,13 @@ class GatewayResponse:
 
 
 class ContextGateway:
-    """Centralised LLM sanitisation + output validation service."""
+    """Centralised LLM sanitisation + output validation service.
+
+    REM-C03: integrates layered injection defense:
+    - Injection classifier (regex + optional LLM second opinion)
+    - Lossy summarization (no redaction markers / tuning oracle)
+    - Structured evidence isolation (XML-delimited untrusted data)
+    """
 
     def __init__(
         self,
@@ -69,54 +82,91 @@ class ContextGateway:
         self.known_technique_ids = known_technique_ids
         self.audit_producer = audit_producer
         self.taxonomy_version = taxonomy_version
+        self._injection_classifier = RegexInjectionClassifier()
 
     async def complete(self, request: GatewayRequest) -> GatewayResponse:
         """Run the full gateway pipeline.
 
         1. Check spend budget.
-        2. Sanitise input (injection detection).
-        3. Redact PII.
-        4. Build cached system prompt.
-        5. Call Anthropic API.
-        6. Validate output.
-        6a. Store raw_output (before stripping).
-        6b. Strip quarantined IDs (deny-by-default).
-        6c. Publish quarantine events to audit.events.
-        7. Deanonymise response.
+        2. Classify injection risk (regex fast path, no redaction markers).
+        3. Transform content based on classification (pass/summarize/quarantine).
+        4. Redact PII.
+        5. Build structured prompt with XML evidence isolation.
+        6. Call Anthropic API (skip if quarantined).
+        7. Validate output.
+        7a. Store raw_output (before stripping).
+        7b. Strip quarantined IDs (deny-by-default).
+        7c. Publish quarantine events to audit.events.
+        8. Deanonymise response.
         """
         # 1 — spend guard
         self.spend_guard.check_budget()
 
-        # 2 — injection detection
-        sanitised_content, detections = sanitise_input(request.user_content)
+        # 2 — injection classification (REM-C03 Part B: no tuning oracle)
+        classification = self._injection_classifier.classify(
+            alert_title="",
+            alert_description=request.user_content,
+            entities_json="",
+        )
+        detections: list[str] = []
+        if classification.action != InjectionAction.PASS:
+            detections.append(
+                f"injection_risk:{classification.risk.value}"
+                f"(confidence={classification.confidence:.2f})"
+            )
 
-        # 3 — PII redaction
-        redacted_content, redaction_map = redact_pii(sanitised_content)
+        # 2a — emit quarantine audit event for malicious content
+        if classification.action == InjectionAction.QUARANTINE:
+            self._emit_injection_quarantined(request, classification)
+            return GatewayResponse(
+                content="Content quarantined for security review.",
+                model_id="",
+                tokens_used=0,
+                valid=False,
+                raw_output="",
+                validation_errors=["Content quarantined: injection detected"],
+                quarantined_ids=[],
+                metrics=None,
+                injection_detections=detections,
+            )
 
-        # 4 — system prompt with cache control
+        # 3 — transform content (REM-C03 Part C: lossy summarize, no markers)
+        transformed_content = transform_content(
+            request.user_content, classification.action.value
+        )
+
+        # 4 — PII redaction
+        redacted_content, redaction_map = redact_pii(transformed_content)
+
+        # 5 — structured prompt with XML evidence isolation (REM-C03 Part A)
+        evidence_block = EvidenceBlock.wrap_evidence(
+            alert_title="",
+            alert_description=redacted_content,
+            entities_json="",
+        )
         system_blocks = build_cached_system_blocks(request.system_prompt)
+        messages = [{"role": "user", "content": evidence_block}]
 
-        # 5 — LLM call
-        messages = [{"role": "user", "content": redacted_content}]
+        # 6 — LLM call
         response_text, metrics = await self.client.complete(
             system=system_blocks,
             messages=messages,
         )
 
-        # 6 — output validation
+        # 7 — output validation
         valid, errors, quarantined = validate_output(
             response_text,
             known_technique_ids=self.known_technique_ids,
             output_schema=request.output_schema,
         )
 
-        # 6a — preserve raw LLM output before any modifications
+        # 7a — preserve raw LLM output before any modifications
         raw_output = response_text
 
-        # 6b — deny-by-default: strip quarantined IDs from content
+        # 7b — deny-by-default: strip quarantined IDs from content
         stripped_text = _strip_quarantined_ids(response_text, quarantined)
 
-        # 6c — publish quarantine events via AuditProducer (fire-and-forget)
+        # 7c — publish quarantine events via AuditProducer (fire-and-forget)
         if quarantined and self.audit_producer is not None:
             for tid in quarantined:
                 self._emit_technique_quarantined(
@@ -126,10 +176,10 @@ class ContextGateway:
                     task_type=request.task_type,
                 )
 
-        # 6d — emit routing.tier_selected audit event with full LLM context
+        # 7d — emit routing.tier_selected audit event with full LLM context
         self._emit_routing_tier_selected(request, metrics)
 
-        # 7 — deanonymise
+        # 8 — deanonymise
         final_text = deanonymise_text(stripped_text, redaction_map)
 
         # record cost
@@ -151,6 +201,29 @@ class ContextGateway:
             metrics=metrics,
             injection_detections=detections,
         )
+
+    def _emit_injection_quarantined(
+        self, request: GatewayRequest, classification: InjectionClassification,
+    ) -> None:
+        """Emit injection.quarantined audit event (fire-and-forget)."""
+        if self.audit_producer is None:
+            return
+        try:
+            self.audit_producer.emit(
+                tenant_id=request.tenant_id,
+                event_type="injection.quarantined",
+                event_category="security",
+                actor_type="agent",
+                actor_id=request.agent_id,
+                context={
+                    "risk": classification.risk.value,
+                    "confidence": classification.confidence,
+                    "reason": classification.reason,
+                    "task_type": request.task_type,
+                },
+            )
+        except Exception:
+            logger.warning("Audit emit failed for injection.quarantined", exc_info=True)
 
     def _emit_technique_quarantined(
         self,

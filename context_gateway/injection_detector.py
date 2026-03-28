@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import re
 
+# REM-C03: Redaction markers removed to eliminate tuning oracle.
+# Legacy constants retained for backward compatibility in tests but are
+# no longer emitted by the gateway pipeline.  The gateway now uses
+# injection_classifier + summarizer (lossy transform, no markers).
 REDACTED_INJECTION = "[REDACTED_INJECTION_ATTEMPT]"
 REDACTED_MARKUP = "[REDACTED_MARKUP]"
 
