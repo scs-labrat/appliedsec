@@ -2,363 +2,275 @@
 
 ## Overview
 
-The ALUSKORT Analyst Dashboard is a server-rendered web application built with FastAPI, HTMX, and Jinja2. It provides SOC analysts with a comprehensive view of investigations, approvals, threat exposure, and system health.
+The ALUSKORT Analyst Dashboard is a server-rendered web application built with FastAPI, HTMX, Jinja2, and Tailwind CSS. It provides SOC analysts and executives with comprehensive views of investigations, approvals, threat exposure, system health, and operational metrics.
 
-**Access**: `http://localhost:8080` (development) or via Kubernetes Ingress (production)
+**Access**: `http://localhost:8080` (development) or via ALB/Ingress (production)
 
 ---
 
 ## Navigation
 
-The dashboard provides 9 primary sections accessible from the navigation bar:
+The dashboard provides 20 pages organised into four navigation groups via dropdown menus:
+
+### Top-Level Pages
 
 | # | Section | Path | Description |
 |---|---------|------|-------------|
-| 1 | Investigations | `/investigations` | Investigation list with filtering and sorting |
-| 2 | Investigation Detail | `/investigations/{id}` | Full investigation context in a single pane |
-| 3 | Approvals | `/approvals` | Queue of investigations awaiting analyst approval |
-| 4 | CTEM | `/ctem` | Continuous Threat Exposure Management dashboard |
-| 5 | CTI | `/cti` | Cyber Threat Intelligence feeds and IOC data |
-| 6 | Adversarial AI | `/adversarial-ai` | MITRE ATLAS monitoring and detection status |
-| 7 | Connectors | `/connectors` | SIEM connector management |
-| 8 | Settings | `/settings` | System configuration and LLM tier management |
-| 9 | Test Harness | `/test-harness` | Demo data generation for testing |
+| 1 | CISO Executive | `/ciso` | Executive dashboard with KPIs, interactive charts, click-to-expand |
+| 2 | Overview | `/overview` | Operational metrics summary |
+| 3 | Investigations | `/investigations` | Investigation list with filtering, sorting, WebSocket updates |
+| 4 | Approvals | `/approvals` | Queue of investigations awaiting analyst approval |
 
-Additionally:
-- **Metrics** (`/metrics`): System performance and health metrics
-- **Timeline** (`/investigations/{id}/timeline`): Investigation event timeline
+### Threat Intel (Dropdown)
+
+| # | Section | Path | Description |
+|---|---------|------|-------------|
+| 5 | CTEM Exposures | `/ctem` | Continuous Threat Exposure Management dashboard |
+| 6 | CTI / IOC Feeds | `/cti` | Cyber Threat Intelligence feeds and IOC data |
+| 7 | Adversarial AI | `/adversarial-ai` | MITRE ATLAS monitoring and detection status |
+| 8 | FP Patterns | `/fp-patterns` | False positive pattern library with governance rules |
+| 9 | Playbooks | `/playbooks` | Response playbook management (create/edit/delete) |
+
+### Platform (Dropdown)
+
+| # | Section | Path | Description |
+|---|---------|------|-------------|
+| 10 | LLM Health | `/llm-health` | LLM provider health, latency, error rates, model status |
+| 11 | Shadow Mode | `/shadow-mode` | Test rules against live traffic without production impact |
+| 12 | Canary Rollout | `/canary` | Progressive rule deployment (shadow → 10% → 25% → 50% → 100%) |
+| 13 | Batch Jobs | `/batch-jobs` | Scheduled batch job monitoring and history |
+| 14 | Audit Trail | `/audit` | Immutable audit records with filtering and export |
+| 15 | Connectors | `/connectors` | SIEM connector management (Sentinel, Elastic, Splunk) |
+
+### Admin (Dropdown)
+
+| # | Section | Path | Description |
+|---|---------|------|-------------|
+| 16 | Users & Roles | `/users` | User management with RBAC role assignment |
+| 17 | Settings | `/settings` | System config, LLM provider/model CRUD, global demo data |
+| 18 | Test Harness | `/test-harness` | Synthetic investigation generation for testing |
+
+### Additional Pages
+
+| # | Section | Path | Description |
+|---|---------|------|-------------|
+| 19 | Investigation Detail | `/investigations/{id}` | Full investigation context in a single pane |
+| 20 | Timeline | `/investigations/{id}/timeline` | Investigation event timeline |
 
 ---
 
-## 1. Investigations List
+## 1. CISO Executive Dashboard
+
+**Path**: `/ciso`
+
+The executive dashboard provides C-suite-ready metrics with interactive visualisations.
+
+### KPI Cards (8)
+
+| KPI | Description | Target |
+|-----|-------------|--------|
+| MTTD | Mean Time to Detect | < 30s |
+| MTTR | Mean Time to Respond | < 15m |
+| Automation Rate | Percentage of alerts handled without human intervention | > 80% |
+| FP Accuracy | False positive classification accuracy | > 98% |
+| SLA Compliance | Investigations resolved within SLA | > 95% |
+| Investigations (30d) | Total investigations in last 30 days | -- |
+| LLM Cost | Total LLM API spend (30d) vs budget | < $400 |
+| Risk Score | Composite risk posture score | > 80 |
+
+### Interactive Charts (7)
+
+All charts support **click-to-expand**: clicking any chart opens a full-width modal with:
+- **Zoom & pan** — scroll to zoom, drag to select a range
+- **Data point inspection** — click any point to see exact values
+- **Toggle data points** — show/hide point markers on line charts
+- **Data table** — toggle raw data table beneath the chart with row highlighting
+- **Export PNG** — download chart as high-resolution image
+- **Copy to clipboard** — copy data table as tab-separated values
+- **Keyboard**: Escape to close
+
+| # | Chart | Type | Description |
+|---|-------|------|-------------|
+| 1 | Alert Volume | Line (3 series) | Total alerts, auto-closed, escalated over 30 days |
+| 2 | MTTD & MTTR Trend | Dual-axis line | Detection and response time trends over 30 days |
+| 3 | Severity Distribution | Doughnut | Open investigations by severity (Critical/High/Medium/Low/Info) |
+| 4 | Investigation Outcomes | Doughnut | True positive vs false positive vs escalated (30d) |
+| 5 | Top MITRE ATT&CK Tactics | Horizontal bar | Most frequently detected tactics (8 categories) |
+| 6 | LLM API Cost | Bar | Daily LLM spend over 30 days |
+| 7 | Automation Rate | Line + target | Automation percentage vs target threshold over 30 days |
+
+### Additional Panels
+
+- **SLA Compliance by Severity** — Progress bars showing SLA met percentage for Critical, High, Medium, Low
+- **CTEM Exposure Posture** — Severity breakdown with remediation progress and overdue count
+- **Adversarial AI Defense** — Injection attempts blocked, ATLAS detections, models monitored
+- **30-Day Executive Summary** — Key numbers: auto-closed, escalated, TP/FP, avg cost/alert, CTEM overdue
+
+### JSON API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/ciso/metrics` | All CISO metrics as JSON (supports auto-refresh) |
+
+---
+
+## 2. Overview Metrics
+
+**Path**: `/overview`
+
+Operational metrics summary including:
+- Investigations by state (open, closed, failed, awaiting human)
+- Severity breakdown (last 24 hours)
+- Mean time to close (7-day rolling average)
+- False positive rate
+- Active kill switches
+- ATLAS detections by trust level
+
+---
+
+## 3. Investigations List
 
 **Path**: `/investigations`
-
-### Layout
-
-The investigations list displays all investigations with key summary information in a table format.
 
 ### Columns
 
 | Column | Description |
 |--------|-------------|
-| Status | Visual indicator (colour-coded badge): `received`, `parsing`, `enriching`, `reasoning`, `awaiting_human`, `responding`, `closed`, `failed` |
+| Status | Colour-coded badge: `received`, `parsing`, `enriching`, `reasoning`, `awaiting_human`, `responding`, `closed`, `failed` |
 | Severity | Critical (red), High (orange), Medium (yellow), Low (blue), Informational (grey) |
 | Alert Title | Source alert title from the SIEM |
-| Classification | AI-generated classification (e.g., "APT lateral movement") |
+| Classification | AI-generated classification |
 | Confidence | Classification confidence (0-100%) |
-| Created | Timestamp when the investigation was created |
-| Cost | Total LLM cost for the investigation in USD |
+| Created | Timestamp |
+| Cost | Total LLM cost in USD |
 
-### Filtering
-
-- **By status**: Filter to specific investigation states
-- **By severity**: Filter by severity level
-- **By tenant**: Multi-tenant filtering
-
-### Sorting
-
-Click column headers to sort ascending/descending. Default sort: most recent first.
-
-### Real-Time Updates
-
-The investigation list updates in real-time via WebSocket (`/ws/investigations`). New investigations appear at the top, and status changes update automatically via HTMX polling.
+### Features
+- **Filtering**: By status, severity, tenant
+- **Sorting**: Click column headers
+- **Real-time updates**: WebSocket (`/ws/investigations`) + HTMX polling
 
 ---
 
-## 2. Investigation Detail
-
-**Path**: `/investigations/{id}`
-
-The investigation detail page presents all collected evidence and decisions in a single-pane view. This is the primary analyst workspace for reviewing an investigation.
-
-### Panel: Alert Information
-
-| Field | Description |
-|-------|-------------|
-| Alert ID | Source SIEM alert identifier |
-| Source | SIEM name (Sentinel, Elastic, Splunk) |
-| Timestamp | Original alert timestamp |
-| Title | Alert title |
-| Description | Full alert description text |
-| Severity | Alert severity level |
-| Tactics | MITRE ATT&CK tactics |
-| Techniques | MITRE ATT&CK technique IDs |
-
-### Panel: Approval Banner
-
-Displayed only for investigations in `AWAITING_HUMAN` state:
-- Prominent banner with investigation classification and confidence
-- **Approve** button (green) -- requires `senior_analyst` or `admin` role
-- **Reject** button (red) -- requires `senior_analyst` or `admin` role
-- Inline investigation summary for quick review
-
-### Panel: Recommended Actions
-
-Ordered list of response actions recommended by the Reasoning Agent:
-- Action description
-- Target entity
-- Risk assessment
-- Whether the action requires approval
-
-### Panel: Decision Chain
-
-Chronological list of all decisions made during the investigation:
-- Agent name and role
-- Action taken
-- Reasoning explanation
-- Confidence at each step
-- Attestation status (for ATLAS detections)
-- Timestamps
-
-### Panel: IOC Matches
-
-Indicators of compromise matched against threat intelligence:
-- IOC type and value
-- Threat intel source
-- Confidence score
-- Associated campaigns and groups
-- First seen / last seen dates
-
-### Panel: CTEM Exposures
-
-CTEM exposures matched to investigation entities:
-- Exposure title and severity
-- CTEM score
-- Asset ID and zone
-- Consequence category
-- SLA deadline and status
-- Remediation guidance
-
-### Panel: Entities
-
-Parsed entities from the alert:
-- Entity type (account, host, IP, file, process, URL, etc.)
-- Primary value
-- Additional properties
-- Extraction confidence
-
-### Panel: UEBA Context
-
-User and Entity Behaviour Analytics data:
-- Entity risk state (no_baseline, unknown, low, medium, high)
-- Risk score
-- Data freshness
-- Behavioural anomalies
-
-### Panel: Similar Incidents
-
-Historically similar investigations found via Qdrant semantic search:
-- Incident ID and title
-- Similarity score
-- Outcome (true positive, false positive)
-- Classification
-- Date
-
-### Panel: Playbooks
-
-Matched response playbooks:
-- Playbook title and category
-- Matched MITRE techniques
-- Steps (automated vs. manual)
-- Review status (draft, approved)
-
-### Panel: ATLAS Techniques
-
-MITRE ATLAS technique matches:
-- ATLAS technique ID and name
-- Telemetry trust level (trusted/untrusted)
-- Attestation status
-- Detection rule that fired
-- Evidence summary
-
-### Panel: Scoring
-
-Investigation scoring breakdown:
-- Overall confidence score
-- Per-agent confidence contributions
-- LLM calls made
-- Total cost in USD
-- Queries executed
-
----
-
-## 3. Approvals Queue
+## 4. Approvals Queue
 
 **Path**: `/approvals`
 
-### Purpose
-
-The approvals queue shows all investigations in `AWAITING_HUMAN` state, sorted by severity (critical first) and then by age (oldest first).
-
-### Workflow
-
-1. Analyst opens the approvals queue
-2. Selects an investigation from the list
-3. Reviews the inline investigation summary (or clicks through to full detail)
-4. Clicks **Approve** to allow the Response Agent to execute recommended actions
-5. Or clicks **Reject** to close the investigation without executing actions
+Shows investigations in `AWAITING_HUMAN` state, sorted by severity then age.
 
 ### Access Control
 
-- **analyst** role: Can view the queue but cannot approve or reject
-- **senior_analyst** role: Can approve or reject investigations
-- **admin** role: Can approve or reject investigations
+| Role | Permission |
+|------|-----------|
+| `analyst` | View only |
+| `senior_analyst` | Approve or reject |
+| `admin` | Approve or reject |
 
 ### Timeout Behaviour
 
-| Severity | Timeout Behaviour |
-|----------|-------------------|
-| Critical | Escalate (remains in queue, emits `approval.escalated`) |
-| High | Escalate (remains in queue, emits `approval.escalated`) |
-| Medium | Auto-close after timeout |
-| Low | Auto-close after timeout |
+| Severity | Action |
+|----------|--------|
+| Critical/High | Escalate (remains in queue) |
+| Medium/Low | Auto-close after timeout |
 
 ---
 
-## 4. CTEM Dashboard
+## 5–9. Threat Intel Pages
 
-**Path**: `/ctem`
+### CTEM Exposures (`/ctem`)
+Exposure summary by severity, SLA status, zone heatmap, top vulnerable assets, exposure trend, remediation progress.
 
-See [CTEM Program Integration](08-ctem-program.md) for full details.
+### CTI / IOC Feeds (`/cti`)
+Active IOCs, threat campaigns, MITRE technique heat map, IOC age distribution, source coverage.
 
-### Views
+### Adversarial AI (`/adversarial-ai`)
+ATLAS detection summary, rule status for all 11 rules, technique coverage matrix, trust assessment, detection timeline.
 
-- **Exposure Summary**: Total open exposures by severity (CRITICAL / HIGH / MEDIUM / LOW)
-- **SLA Status**: Count of exposures within SLA, approaching SLA, and breached
-- **Zone Heatmap**: Exposure density across Purdue model zones
-- **Top Vulnerable Assets**: Assets ranked by cumulative CTEM score
-- **Exposure Trend**: Chart showing new vs. closed exposures over time
-- **Remediation Progress**: Percentage of exposures in each remediation stage
+### FP Patterns (`/fp-patterns`)
+False positive pattern library with governance-approved suppression rules, pattern confidence scores, and match statistics.
 
----
-
-## 5. CTI Dashboard
-
-**Path**: `/cti`
-
-### Views
-
-- **Active IOCs**: Recently ingested indicators of compromise with confidence scores
-- **Threat Campaigns**: Active campaigns from threat intelligence feeds
-- **MITRE Technique Heat Map**: Most frequently observed ATT&CK techniques
-- **IOC Age Distribution**: Freshness of threat intelligence data
-- **Source Coverage**: Which TI feeds are active and their contribution
+### Playbooks (`/playbooks`)
+Response playbook management with create, edit, and delete functionality. Playbooks are categorised by threat type and linked to MITRE techniques.
 
 ---
 
-## 6. Adversarial AI Dashboard
+## 10–15. Platform Pages
 
-**Path**: `/adversarial-ai`
+### LLM Health (`/llm-health`)
+Provider health status, model latency graphs, error rates, token usage, cost breakdown by model.
 
-See [ATLAS / Adversarial AI](09-atlas-adversarial-ai.md) for full details.
+### Shadow Mode (`/shadow-mode`)
+Test new rules against live traffic without affecting production outcomes. Shows shadow vs production comparison metrics.
 
-### Views
+### Canary Rollout (`/canary`)
+Progressive rule deployment with 5 phases: shadow → 10% → 25% → 50% → 100%.
 
-- **Detection Summary**: Active ATLAS detections grouped by technique
-- **Rule Status**: Health status for all 11 detection rules
-- **Technique Coverage Matrix**: Which ATLAS techniques have active detection rules
-- **Trust Assessment**: Telemetry trust level distribution
-- **Detection Timeline**: Chronological view of detections
-- **Investigation Links**: Investigations correlated with ATLAS detections
+| Feature | Description |
+|---------|-------------|
+| Promote | Advance a canary slice to the next phase |
+| Rollback | Return a slice to shadow mode |
+| Create | Add a new canary slice (name, rule family, dimension, value, threshold) |
+| Edit | Modify slice configuration inline |
+| Delete | Remove a canary slice |
+| Auto-rollback | Automatic rollback when success rate drops below threshold (default 95%) |
+| History | Full promotion/rollback history with actor and timestamp |
 
----
+### Batch Jobs (`/batch-jobs`)
+Monitor scheduled batch jobs (FP training, retrospective analysis, embedding refresh). View execution history and status.
 
-## 7. Connectors
+### Audit Trail (`/audit`)
+Browse immutable, chain-verified audit records. Filter by event type, severity, actor, date range. Records include decision, action, approval, security, and system events.
 
-**Path**: `/connectors`
-
-### Purpose
-
-Manage SIEM connector configurations for Sentinel, Elastic, and Splunk adapters.
-
-### Connector Properties
-
-| Property | Description |
-|----------|-------------|
-| Connector ID | Unique identifier |
-| Type | sentinel, elastic, splunk |
-| Status | active, paused, error |
-| Configuration | JSON configuration (credentials, endpoints, filters) |
-| Last Poll | Timestamp of last successful poll |
-| Alert Count | Total alerts ingested |
-
-### Actions
-
-- **Add Connector**: Configure a new SIEM connection
-- **Edit Connector**: Modify existing connector settings
-- **Pause/Resume**: Temporarily pause alert ingestion
-- **Delete Connector**: Remove a connector (admin only)
-- **Test Connection**: Verify connectivity to the SIEM
+### Connectors (`/connectors`)
+Manage SIEM connections for Sentinel, Elastic, and Splunk. Add, edit, pause/resume, delete, and test connectivity.
 
 ---
 
-## 8. Settings
+## 16–18. Admin Pages
 
-**Path**: `/settings`
+### Users & Roles (`/users`)
+User management with RBAC role assignment (analyst, senior_analyst, admin). Create, edit, enable/disable, and delete user accounts.
 
-### System Configuration
+### Settings (`/settings`)
 
-- **Log Level**: Adjust logging verbosity (DEBUG, INFO, WARNING, ERROR)
-- **Kill Switches**: View and manage active kill switches across all 4 dimensions
+Four configuration tabs:
 
-### LLM Tier Management
+| Tab | Features |
+|-----|----------|
+| **General** | Log level, kill switches, spend limits, degradation level |
+| **LLM Tiers** | Model tier assignments and routing configuration |
+| **Spend** | Monthly spend tracking, per-tier and per-tenant breakdown |
+| **LLM Providers** | Full CRUD for providers, models, and API keys |
 
-- **Model Configuration**: View current model assignments per tier
-- **Fallback Status**: Current fallback provider health
-- **Degradation Level**: Current system degradation level (full_capability, secondary_active, deterministic_only)
+#### LLM Provider Management
+- **Add/Edit/Delete providers**: Name, base URL, API key (masked after save)
+- **Add/Edit/Delete models**: Model name, tier, context window, token limits, temperature, cost, SLO, tasks, fallback, extended thinking
+- **Enable/Disable**: Toggle providers and models on/off
+- **Demo data**: Load or clear demo providers/models
 
-### Spend Tracking
+#### Global Demo Data Management
+- **Load All Demo Data**: Populates all pages (users, LLM providers/models, canary slices, shadow mode, playbooks, batch jobs, investigations)
+- **Remove All Demo Data**: Clears all demo data across DB tables and in-memory stores
 
-- **Monthly Spend**: Current month's LLM API spend vs. soft limit and hard cap
-- **Spend by Tier**: Breakdown of cost by model tier
-- **Spend by Tenant**: Per-tenant cost allocation
-- **Spend by Task Type**: Cost breakdown by task category
+### Test Harness (`/test-harness`)
+Generate synthetic investigation data across 15 scenarios in 5 categories (APT, Ransomware, Insider Threat, Cloud Compromise, Adversarial AI).
 
 ---
 
-## 9. Test Harness
+## Design System
 
-**Path**: `/test-harness`
+The dashboard uses the **Applied Computing Technologies** design system:
 
-### Purpose
-
-Generate synthetic investigation data for testing and demonstration. The test harness creates full-fidelity `GraphState` objects that populate every section of the investigation detail page.
-
-### Scenario Categories (5)
-
-| Category | Tag | Description |
-|----------|-----|-------------|
-| APT / Nation-state | `apt` | Advanced persistent threat scenarios (Cobalt Strike, lateral movement) |
-| Ransomware | `ransomware` | Ransomware deployment and encryption scenarios |
-| Insider Threat | `insider` | Insider IP theft and data exfiltration scenarios |
-| Cloud Compromise | `cloud` | Cloud infrastructure attacks (IAM, key theft) |
-| Adversarial AI | `adversarial_ai` | AI/ML-specific attacks (model poisoning, prompt injection) |
-
-### Scenarios (15)
-
-| # | Title | Category | Severity |
-|---|-------|----------|----------|
-| 1 | Cobalt Strike Beacon -- C2 Callback Detected | APT | Critical |
-| 2 | Suspected APT Lateral Movement via PsExec | APT | High |
-| 3 | DLL Side-Loading from Suspicious Path | APT | High |
-| 4 | Ransomware Pre-Encryption: Volume Shadow Copy Deletion | Ransomware | Critical |
-| 5 | Mass File Encryption Detected on File Server | Ransomware | Critical |
-| 6 | Ransomware C2 Beacon to Known Infrastructure | Ransomware | High |
-| 7 | Unusual Data Transfer to Personal Cloud Storage | Insider | High |
-| 8 | Privileged Account Accessing Sensitive Repositories | Insider | Medium |
-| 9 | Bulk Download of Customer Database Records | Insider | High |
-| 10 | AWS Root Account API Key Used from Unknown IP | Cloud | Critical |
-| 11 | Azure AD Conditional Access Policy Disabled | Cloud | High |
-| 12 | GCP Service Account Key Exported | Cloud | Medium |
-| 13 | ML Model Training Data Poisoning Attempt | Adversarial AI | High |
-| 14 | LLM Prompt Injection via Customer Support Channel | Adversarial AI | High |
-| 15 | Edge Node Inference Model Tampering | Adversarial AI | Critical |
-
-### Usage
-
-1. Navigate to `/test-harness`
-2. Select scenario category or individual scenarios
-3. Click "Generate" to create investigations
-4. Investigations appear immediately in the investigations list
-5. Full detail pages are populated with realistic data
+| Element | Value |
+|---------|-------|
+| Primary font | Montserrat |
+| Body font | Figtree |
+| Mono font | Fragment Mono |
+| Background | `#0e0e0e` |
+| Surface | `#131317` |
+| Card | `#18181c` |
+| Accent (red) | `#e9311a` |
+| Success (green) | `#028d5c` |
+| Warning (orange) | `#ed6c35` |
+| Info (blue) | `#2060df` |
+| Charts | Chart.js 4.4.7 + chartjs-plugin-zoom 2.2.0 |
+| Interactivity | HTMX 1.9.10 |

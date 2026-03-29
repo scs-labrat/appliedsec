@@ -196,7 +196,7 @@ volumes:
   - ./infra/migrations:/docker-entrypoint-initdb.d
 ```
 
-Files are executed in alphabetical order (001 through 012).
+Files are executed in alphabetical order (001 through 013).
 
 ### Manual Application
 
@@ -227,6 +227,7 @@ docker compose exec postgres psql -U aluskort -d aluskort
 | 010 | `010_incident_memory_rare.sql` | Incident memory rare entity columns |
 | 011 | `011_dashboard_sessions.sql` | Dashboard session management |
 | 012 | `012_connectors.sql` | SIEM connector configuration |
+| 013 | `013_llm_providers.sql` | LLM providers and models tables |
 
 ---
 
@@ -247,6 +248,112 @@ The single Dockerfile is shared by all services. Each service is selected via th
 docker tag aluskort:latest ghcr.io/aluskort/aluskort:latest
 docker push ghcr.io/aluskort/aluskort:latest
 ```
+
+---
+
+## AWS Production Deployment (Terraform)
+
+ALUSKORT includes a complete Terraform configuration for production deployment on AWS, located in `infra/terraform/`.
+
+### Prerequisites (AWS)
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Terraform | 1.5+ | Infrastructure as Code |
+| AWS CLI | 2.x | AWS credential management |
+| Docker | 24.0+ | Container image build/push |
+| AWS Account | -- | With IAM permissions for VPC, ECS, RDS, ElastiCache, MSK, ECR, ALB, Secrets Manager, CloudWatch |
+
+### Infrastructure Provisioned
+
+| Component | Service | Details |
+|-----------|---------|---------|
+| **Networking** | VPC | 3-AZ, public/private subnets, NAT gateway, VPC flow logs |
+| **Compute** | ECS Fargate | 6 services with auto-scaling, circuit breaker rollback |
+| **Database** | RDS PostgreSQL 16 | Multi-AZ (prod), encrypted, 14-day backups, performance insights |
+| **Cache** | ElastiCache Redis 7 | Encrypted at rest/transit, automatic failover, 2 replicas |
+| **Streaming** | MSK Kafka 3.6 | 3 brokers, TLS encryption, CloudWatch logging |
+| **Load Balancer** | ALB | HTTPS (TLS 1.3), HTTP redirect, access logs to S3 |
+| **Registry** | ECR | Per-service repos with image scanning and lifecycle policies |
+| **Secrets** | Secrets Manager | Anthropic API key, DB credentials |
+| **Monitoring** | CloudWatch | CPU/memory/storage alarms, SNS email alerts, operational dashboard |
+
+### Interactive Deployment Wizard
+
+```bash
+cd infra/terraform
+bash deploy.sh
+```
+
+The wizard guides through 9 steps:
+
+| Step | Configuration |
+|------|---------------|
+| 1 | AWS region and environment (prod/staging/dev) |
+| 2 | Domain name and ACM certificate ARN (optional, for HTTPS) |
+| 3 | RDS instance class and database password |
+| 4 | ElastiCache Redis and MSK Kafka instance sizes |
+| 5 | Anthropic API key |
+| 6 | CloudWatch alarm notification email |
+| 7 | ECS service replica counts per service |
+| 8 | Generate `terraform.tfvars` |
+| 9 | Review configuration and estimated cost |
+
+After confirmation, the wizard runs `terraform init`, `plan`, `apply`, then builds and pushes Docker images to ECR and triggers ECS redeployment.
+
+### Estimated Monthly Cost
+
+| Component | Estimate |
+|-----------|----------|
+| RDS (db.t4g.medium) | ~$50–100 |
+| ElastiCache (cache.t4g.small) | ~$25–50 |
+| MSK (3 x kafka.t3.small) | ~$150–200 |
+| ECS Fargate (6 services) | ~$100–200 |
+| ALB + NAT | ~$40–60 |
+| **Total** | **~$365–610/mo** |
+
+### Wizard Flags
+
+```bash
+bash deploy.sh --plan-only    # Generate config + plan without applying
+bash deploy.sh --skip-build   # Apply infra without building Docker images
+bash deploy.sh --destroy      # Tear down all infrastructure
+```
+
+### Manual Terraform (without wizard)
+
+```bash
+cd infra/terraform
+terraform init
+
+# Create terraform.tfvars with required variables (see variables.tf)
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+### Terraform Modules
+
+| Module | Path | Resources |
+|--------|------|-----------|
+| `vpc` | `modules/vpc/` | VPC, subnets, IGW, NAT, route tables, flow logs |
+| `ecr` | `modules/ecr/` | ECR repositories with lifecycle policies |
+| `secrets` | `modules/secrets/` | Secrets Manager secret |
+| `rds` | `modules/rds/` | RDS instance, subnet group, security group, parameter group |
+| `elasticache` | `modules/elasticache/` | Redis replication group, subnet group, security group |
+| `msk` | `modules/msk/` | MSK cluster, configuration, security group |
+| `alb` | `modules/alb/` | ALB, listeners, target group, S3 access logs |
+| `ecs` | `modules/ecs/` | ECS cluster, task definitions, services, auto-scaling, IAM roles |
+| `monitoring` | `modules/monitoring/` | CloudWatch alarms, SNS topic, operational dashboard |
+
+### Post-Deployment
+
+After deployment completes:
+
+1. **Verify**: `curl https://your-domain.com/health`
+2. **DNS**: Create a CNAME record pointing your domain to the ALB DNS name
+3. **Logs**: `aws logs tail /ecs/aluskort-prod/dashboard --follow`
+4. **Monitor**: Open CloudWatch dashboard `aluskort-prod-overview`
+5. **ECS**: `aws ecs list-services --cluster aluskort-prod-cluster`
 
 ---
 

@@ -9,6 +9,8 @@
 | Method | Path | Description | Auth Required |
 |--------|------|-------------|---------------|
 | GET | `/` | Redirect to `/investigations` | No |
+| GET | `/ciso` | CISO executive dashboard | Yes |
+| GET | `/overview` | Overview metrics page | Yes |
 | GET | `/investigations` | Investigation list page | Yes |
 | GET | `/investigations/{id}` | Investigation detail page | Yes |
 | GET | `/investigations/{id}/timeline` | Investigation timeline | Yes |
@@ -16,9 +18,16 @@
 | GET | `/ctem` | CTEM exposure dashboard | Yes |
 | GET | `/cti` | CTI threat intelligence dashboard | Yes |
 | GET | `/adversarial-ai` | ATLAS monitoring dashboard | Yes |
+| GET | `/fp-patterns` | FP pattern library | Yes |
+| GET | `/playbooks` | Playbook management | Yes |
+| GET | `/llm-health` | LLM provider health dashboard | Yes |
+| GET | `/shadow-mode` | Shadow mode testing dashboard | Yes |
+| GET | `/canary` | Canary rollout control dashboard | Yes |
+| GET | `/batch-jobs` | Batch job monitoring | Yes |
+| GET | `/audit` | Audit trail browser | Yes |
 | GET | `/connectors` | SIEM connector management | Yes (admin) |
-| GET | `/settings` | System settings page | Yes (admin) |
-| GET | `/metrics` | System metrics page | Yes |
+| GET | `/users` | User & role management | Yes (admin) |
+| GET | `/settings` | System settings & LLM CRUD | Yes (admin) |
 | GET | `/test-harness` | Test data generation page | Yes |
 
 ### REST API Endpoints
@@ -53,6 +62,23 @@
 | DELETE | `/api/connectors/{id}` | Delete connector | -- | `{deleted: true}` |
 | POST | `/api/connectors/{id}/test` | Test connectivity | -- | `{success, message}` |
 
+#### CISO Metrics
+
+| Method | Path | Description | Response |
+|--------|------|-------------|----------|
+| GET | `/api/ciso/metrics` | All CISO executive metrics (30d trends, KPIs, charts) | Full metrics JSON |
+
+#### Canary Rollout
+
+| Method | Path | Description | Request Body | Response |
+|--------|------|-------------|-------------|----------|
+| POST | `/api/canary/promote` | Promote canary slice to next phase | `{slice_id}` | `{ok, slice_id, old_phase, new_phase}` |
+| POST | `/api/canary/rollback` | Rollback canary to shadow | `{slice_id, reason}` | `{ok, slice_id, old_phase, new_phase}` |
+| POST | `/api/canary/create` | Create new canary slice | `{slice_name, rule_family, dimension, value, auto_rollback_threshold}` | `{ok, slice_id, slice}` |
+| PUT | `/api/canary/{slice_id}` | Update canary slice config | `{slice_name?, rule_family?, ...}` | `{ok, updated_fields}` |
+| DELETE | `/api/canary/{slice_id}` | Delete canary slice | -- | `{ok, deleted}` |
+| GET | `/api/canary/history` | Get promotion/rollback history | -- | `{history, total}` |
+
 #### Settings
 
 | Method | Path | Description | Request Body | Response |
@@ -61,13 +87,33 @@
 | PUT | `/api/settings` | Update settings | `{key, value}` | `{updated: true}` |
 | GET | `/api/settings/spend` | Get spend summary | -- | `{monthly_total, by_tier, by_tenant}` |
 
+#### LLM Provider CRUD
+
+| Method | Path | Description | Request Body | Response |
+|--------|------|-------------|-------------|----------|
+| GET | `/api/settings/providers` | List LLM providers | -- | `[{provider_id, display_name, api_base_url, enabled}]` |
+| POST | `/api/settings/providers` | Create provider | `{provider_id, display_name, api_base_url, api_key}` | `{ok, provider_id}` |
+| PUT | `/api/settings/providers/{id}` | Update provider | `{display_name?, api_base_url?, api_key?, enabled?}` | `{ok, updated_fields}` |
+| DELETE | `/api/settings/providers/{id}` | Delete provider (cascades to models) | -- | `{ok, deleted}` |
+| GET | `/api/settings/models` | List LLM models | -- | `[{model_id, provider_id, display_name, tier, ...}]` |
+| POST | `/api/settings/models` | Create model | `{model_id, provider_id, display_name, model_name, tier, ...}` | `{ok, model_id}` |
+| PUT | `/api/settings/models/{id}` | Update model | `{display_name?, tier?, cost_input?, ...}` | `{ok, updated_fields}` |
+| DELETE | `/api/settings/models/{id}` | Delete model | -- | `{ok, deleted}` |
+
+#### Demo Data Management
+
+| Method | Path | Description | Response |
+|--------|------|-------------|----------|
+| POST | `/api/settings/providers/demo/load` | Load demo LLM providers/models | `{ok, providers, models}` |
+| POST | `/api/settings/providers/demo/clear` | Clear all LLM providers/models | `{ok, cleared}` |
+| POST | `/api/settings/demo/load-all` | Load demo data across all pages | `{ok, loaded}` |
+| POST | `/api/settings/demo/clear-all` | Clear ALL demo data globally | `{ok, cleared}` |
+
 #### Metrics
 
 | Method | Path | Description | Response |
 |--------|------|-------------|----------|
-| GET | `/api/metrics/investigations` | Investigation counts by state | `{received: n, parsing: n, ...}` |
-| GET | `/api/metrics/fp-rate` | FP auto-close rate | `{rate: 0.98, total: n, auto_closed: n}` |
-| GET | `/api/metrics/cost` | LLM cost summary | `{monthly_total, daily_avg, by_tier}` |
+| GET | `/api/metrics` | Overview metrics (state counts, severity, MTTC, FP rate) | Full metrics JSON |
 
 ### Health
 

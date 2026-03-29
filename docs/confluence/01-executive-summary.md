@@ -68,5 +68,6 @@ The platform is purpose-built for hybrid IT/OT environments where both tradition
 | Sprint 2 | CTEM Normaliser, ATLAS Detection, Batch Scheduler, Audit Service | Complete |
 | Sprint 3 | SIEM Adapters (Sentinel, Elastic, Splunk), Analyst Dashboard | Complete |
 | Sprint 4 | Adversarial review hardening, production readiness | Complete |
+| Sprint 5 | Dashboard expansion (20 pages), CISO executive dashboard, LLM CRUD, canary/shadow mode, Terraform AWS | Complete |
 
-All epics delivered. Platform is in active use with test harness validation across 15 synthetic scenarios spanning APT, ransomware, insider threat, cloud compromise, and adversarial AI attack categories.
+All epics delivered. Platform includes 20 dashboard pages, a CISO executive dashboard with 7 interactive charts, full LLM provider/model CRUD, canary rollout controls, shadow mode testing, and Terraform-based AWS production deployment. Test harness validation covers 15 synthetic scenarios spanning APT, ransomware, insider threat, cloud compromise, and adversarial AI attack categories.

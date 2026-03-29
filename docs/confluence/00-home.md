@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Project** | ALUSKORT -- Autonomous SOC Investigation Platform |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-03-29 |
 | **Classification** | INTERNAL -- Security Operations |
 
@@ -28,8 +28,8 @@ ALUSKORT is an AI-augmented Security Operations Centre (SOC) platform that autom
 | 07 | [Security Controls](07-security-controls.md) | AuthN/AuthZ, adversarial AI defense, audit trail |
 | 08 | [CTEM Program](08-ctem-program.md) | Exposure management, Purdue zones, SLA computation |
 | 09 | [ATLAS / Adversarial AI](09-atlas-adversarial-ai.md) | MITRE ATLAS detections, 11 rules, threat model |
-| 10 | [Dashboard User Guide](10-dashboard-guide.md) | All 9 dashboard sections, workflow instructions |
-| 11 | [Deployment Guide](11-deployment-guide.md) | Docker, K8s, migrations, env vars |
+| 10 | [Dashboard User Guide](10-dashboard-guide.md) | All 20 dashboard pages, CISO charts, workflow instructions |
+| 11 | [Deployment Guide](11-deployment-guide.md) | Docker, K8s, Terraform AWS, migrations, env vars |
 | 12 | [Operations Runbook](12-operations-runbook.md) | Monitoring, troubleshooting, incident response |
 | 13 | [API Reference](13-api-reference.md) | REST, WebSocket, Kafka contracts |
 | 14 | [Testing Guide](14-testing-guide.md) | Test harness, pytest, security testing |
@@ -41,12 +41,16 @@ ALUSKORT is an AI-augmented Security Operations Centre (SOC) platform that autom
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Core Pipeline | `ACTIVE` | Entity Parser, Orchestrator, Context Gateway |
-| Dashboard | `ACTIVE` | FastAPI + HTMX analyst UI |
+| Dashboard | `ACTIVE` | FastAPI + HTMX analyst UI, 20 pages, CISO executive charts |
+| CISO Dashboard | `ACTIVE` | 8 KPIs, 7 interactive Chart.js visualisations, click-to-expand |
 | SIEM Adapters | `ACTIVE` | Sentinel, Elastic, Splunk |
 | CTEM Normaliser | `ACTIVE` | Wiz, Snyk, Garak, ART integrations |
 | ATLAS Detection | `ACTIVE` | 11 detection rules operational |
 | Batch Scheduler | `ACTIVE` | FP pattern training, retrospective analysis |
 | Audit Service | `ACTIVE` | SHA-256 hash-chain, per-tenant |
+| Canary Rollout | `ACTIVE` | Progressive rule deployment with auto-rollback |
+| Shadow Mode | `ACTIVE` | Non-production rule testing against live traffic |
+| Terraform IaC | `ACTIVE` | AWS production deployment (VPC, ECS, RDS, MSK, ElastiCache) |
 
 ---
 
